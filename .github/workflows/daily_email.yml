@@ -1,0 +1,30 @@
+name: NHL Daily Edge Email
+on:
+  schedule:
+    # 7:00 AM MST = 14:00 UTC (during standard time)
+    # 7:00 AM MDT = 13:00 UTC (during daylight saving time)
+    # Running at both to cover the seasonal switch:
+    - cron: '0 14 * * *'
+  workflow_dispatch:  # Allows manual trigger from GitHub Actions UI for testing
+
+jobs:
+  send-daily-email:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: pip install requests pytz
+      
+      - name: Run daily email script
+        env:
+          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+        run: python daily_email.py
