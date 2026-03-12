@@ -14,7 +14,7 @@ import pytz
 # ── CONFIG ────────────────────────────────────────────────────────────────────
 BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "YOUR_BREVO_API_KEY_HERE")       # Brevo → Account → SMTP & API → API Keys
 ODDS_API_KEY  = os.environ.get("ODDS_API_KEY", "YOUR_ODDS_API_KEY_HERE")        # the-odds-api.com → Account
-FROM_EMAIL    = "icecoldanalytics@shaw.ca"
+FROM_EMAIL    = "info@icecoldanalytics.ca"
 FROM_NAME     = "Ice Cold Analytics"
 SEND_TO_LIST_ID = None  # Optional: your Brevo list ID — if None, sends to all contacts
 
