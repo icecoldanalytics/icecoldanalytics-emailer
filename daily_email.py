@@ -431,7 +431,11 @@ def get_brevo_contacts():
         "Content-Type": "application/json"
     }
     try:
-        r = requests.get(url, headers=headers, params={"limit": 100}, timeout=10)
+        list_id = os.environ.get("BREVO_LIST_ID")
+        params = {"limit": 100}
+        if list_id:
+            params["listId"] = int(list_id)
+        r = requests.get(url, headers=headers, params=params, timeout=10)
         r.raise_for_status()
         contacts = r.json().get("contacts", [])
         emails = [c["email"] for c in contacts if c.get("email")]
