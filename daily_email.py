@@ -418,7 +418,7 @@ def build_email_html(games_with_signals, odds_data, day_label, yesterday_results
     if regular_games:
         regular_section = f'''
         <tr><td style="padding:20px 24px 8px;">
-          <p style="font-family:monospace;font-size:9px;letter-spacing:2px;color:#5a7a8a;text-transform:uppercase;margin:0 0 10px;">Remaining Games — No Situational Edge</p>
+          <p style="font-family:monospace;font-size:9px;letter-spacing:2px;color:#5a7a8a;text-transform:uppercase;margin:0 0 10px;">Tonight\'s Full Slate</p>
           {regular_games_html}
         </td></tr>'''
 
