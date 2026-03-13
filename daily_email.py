@@ -165,7 +165,7 @@ def get_yesterday_signals(scores):
         elif away_b2b and not home_b2b and home_rest == 2:
             signal_label = "Signal 1 Partial"
         else:
-            continue  # No signal — skip
+            signal_label = "No Signal"
 
         # Did the fade win? We fade the away team = home team wins
         home_won = g["home_score"] > g["away_score"]
@@ -178,7 +178,7 @@ def get_yesterday_signals(scores):
             "home_score": g["home_score"],
             "score_str": score_str,
             "signal_label": signal_label,
-            "fade_won": home_won,  # We fade away = root for home
+            "fade_won": home_won if signal_label != "No Signal" else None,
             "away_b2b": away_b2b,
             "home_rest": home_rest
         })
