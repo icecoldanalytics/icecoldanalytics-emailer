@@ -334,9 +334,9 @@ def build_results_html(yesterday_results, yesterday_date):
 
     rows = ""
     for r in yesterday_results:
-        icon = "✅" if r["fade_won"] else "❌"
-        result_color = "#00ff88" if r["fade_won"] else "#ff4444"
-        result_word = "WIN" if r["fade_won"] else "LOSS"
+        icon = "✅" if r["fade_won"] is True else "❌" if r["fade_won"] is False else "·"
+        result_color = "#00ff88" if r["fade_won"] is True else "#ff4444" if r["fade_won"] is False else "#5a7a8a"
+        result_word = "WIN" if r["fade_won"] is True else "LOSS" if r["fade_won"] is False else "NO SIGNAL"
         fade_note = f"Fade {r['away']} ({'B2B' if r['away_b2b'] else ''}) · Home rested {r['home_rest']}d"
         rows += f'''
         <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;border:1px solid #1e2d38;border-radius:4px;">
