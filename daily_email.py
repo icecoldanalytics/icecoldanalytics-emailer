@@ -362,15 +362,116 @@ def build_results_html(yesterday_results, yesterday_date):
       {rows}
     </td></tr>'''
 
+def fetch_fantasy_picks():
+    """Fetch today's fantasy picks from the live site"""
+    try:
+        r = requests.get("https://icecoldanalytics.ca/data/fantasy.json", timeout=10)
+        r.raise_for_status()
+        return r.json()
+    except Exception as e:
+        print(f"Fantasy fetch error: {e}")
+        return None
+
+def build_fantasy_section(fantasy):
+    """Build a condensed fantasy picks section for email"""
+    if not fantasy:
+        return ""
+    
+    vp = fantasy.get("value_plays", {})
+    plays = vp.get("plays", [])[:5]  # Top 5 plays only
+    pp = fantasy.get("player_props", {})
+    props = pp.get("props", [])[:4]  # Top 4 props
+    gs = fantasy.get("goalie_starts", {})
+    goalies = [g for g in gs.get("goalies", []) if g.get("recommendation") == "start"][:2]
+
+    if not plays:
+        return ""
+
+    plays_html = ""
+    for p in plays:
+        tier_color = "#ffb020" if p["tier"] == "S" else "#00c2ff" if p["tier"] == "A" else "#00ff88"
+        tags_html = " ".join(f'<span style="background:#1e2d38;color:#8fafc4;font-size:9px;padding:2px 5px;border-radius:2px;margin-right:3px;">{t}</span>' for t in p.get("tags", []))
+        plays_html += f'''
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:6px;border:1px solid #1e2d38;border-radius:4px;background:#0d1a24;">
+          <tr>
+            <td style="padding:8px 12px;">
+              <span style="background:{tier_color};color:#000;font-family:monospace;font-size:9px;font-weight:bold;padding:2px 5px;border-radius:2px;margin-right:6px;">{p["tier"]}</span>
+              <span style="font-family:monospace;font-size:13px;font-weight:bold;color:#e8f0f4;">{p["player"]}</span>
+              <span style="font-family:monospace;font-size:10px;color:#5a7a8a;margin-left:6px;">{p["team"]} · {p["position"]} · {p["matchup"]}</span>
+            </td>
+            <td style="padding:8px 12px;text-align:right;white-space:nowrap;">
+              <span style="font-family:monospace;font-size:10px;color:#8fafc4;">DK {p["dk_salary"]}</span>
+              <span style="font-family:monospace;font-size:10px;color:#5a7a8a;margin:0 4px;">·</span>
+              <span style="font-family:monospace;font-size:10px;color:#8fafc4;">FD {p["fd_salary"]}</span>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="2" style="padding:0 12px 8px;">
+              <span style="font-family:monospace;font-size:10px;color:#5a7a8a;">{p["reason"][:120]}{"..." if len(p["reason"]) > 120 else ""}</span>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="2" style="padding:0 12px 8px;">{tags_html}</td>
+          </tr>
+        </table>'''
+
+    props_html = ""
+    for p in props:
+        pick_color = "#00ff88" if p["pick"] == "over" else "#ff4444" if p["pick"] == "under" else "#00c2ff"
+        props_html += f'''
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:6px;border:1px solid #1e2d38;border-radius:4px;background:#0d1a24;">
+          <tr>
+            <td style="padding:8px 12px;">
+              <span style="font-family:monospace;font-size:13px;font-weight:bold;color:#e8f0f4;">{p["player"]}</span>
+              <span style="font-family:monospace;font-size:10px;color:#5a7a8a;margin-left:6px;">— {p["prop_type"]}</span>
+            </td>
+            <td style="padding:8px 12px;text-align:right;white-space:nowrap;">
+              <span style="color:{pick_color};font-family:monospace;font-size:11px;font-weight:bold;">{p["pick"].upper()} {p["line"]}</span>
+              <span style="font-family:monospace;font-size:10px;color:#8fafc4;margin-left:6px;">{p["odds"]}</span>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="2" style="padding:0 12px 8px;font-family:monospace;font-size:10px;color:#5a7a8a;">{p["reason"][:120]}{"..." if len(p["reason"]) > 120 else ""}</td>
+          </tr>
+        </table>'''
+
+    goalies_html = ""
+    for g in goalies:
+        goalies_html += f'''
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:6px;border:1px solid #1e2d38;border-radius:4px;background:#0d1a24;">
+          <tr>
+            <td style="padding:8px 12px;">
+              <span style="background:#00ff88;color:#000;font-family:monospace;font-size:9px;font-weight:bold;padding:2px 5px;border-radius:2px;margin-right:6px;">▲ Start</span>
+              <span style="font-family:monospace;font-size:13px;font-weight:bold;color:#e8f0f4;">{g["name"]}</span>
+              <span style="font-family:monospace;font-size:10px;color:#5a7a8a;margin-left:6px;">{g["team"]} vs {g["opponent"]}</span>
+            </td>
+            <td style="padding:8px 12px;text-align:right;white-space:nowrap;">
+              <span style="font-family:monospace;font-size:10px;color:#8fafc4;">{g["sv_pct"]} SV% · {g["gaa"]} GAA</span>
+            </td>
+          </tr>
+          {f'<tr><td colspan="2" style="padding:0 12px 8px;font-family:monospace;font-size:10px;color:#ffb020;">{g["signal_note"]}</td></tr>' if g.get("signal_note") else ""}
+        </table>'''
+
+    return f'''
+        <!-- FANTASY PICKS -->
+        <tr><td style="background:#0d1a24;border-left:1px solid #1e2d38;border-right:1px solid #1e2d38;padding:16px 24px 8px;">
+          <p style="font-family:monospace;font-size:9px;letter-spacing:2px;color:#00c2ff;text-transform:uppercase;margin:0 0 10px;">🏒 Top Fantasy Plays · {fantasy.get("date_label","")}</p>
+          {plays_html}
+          <p style="font-family:monospace;font-size:9px;letter-spacing:2px;color:#5a7a8a;text-transform:uppercase;margin:12px 0 8px;">📊 Top Props</p>
+          {props_html}
+          {"<p style='font-family:monospace;font-size:9px;letter-spacing:2px;color:#5a7a8a;text-transform:uppercase;margin:12px 0 8px;'>🥅 Goalie Starts</p>" + goalies_html if goalies_html else ""}
+          <p style="font-family:monospace;font-size:10px;color:#5a7a8a;margin:8px 0 0;">Full picks + goalie table → <a href="https://icecoldanalytics.ca" style="color:#00c2ff;text-decoration:none;">icecoldanalytics.ca</a></p>
+        </td></tr>'''
+
 # ── BUILD EMAIL HTML ──────────────────────────────────────────────────────────
-def build_email_html(games_with_signals, odds_data, day_label, yesterday_results=None, yesterday_date=""):
+def build_email_html(games_with_signals, odds_data, day_label, yesterday_results=None, yesterday_date="", fantasy=None):
     signal_games = [g for g in games_with_signals if g["signal"] in ("HIGH", "MID")]
     regular_games = [g for g in games_with_signals if g["signal"] not in ("HIGH", "MID")]
 
     def game_row(g, highlight=False):
         odds = match_odds(g, odds_data)
-        away_b2b_badge = '<span style="background:#ff4444;color:#fff;font-size:9px;padding:2px 5px;border-radius:2px;margin-left:4px;">B2B</span>' if g["away_b2b"] else ""
-        home_b2b_badge = '<span style="background:#ff4444;color:#fff;font-size:9px;padding:2px 5px;border-radius:2px;margin-left:4px;">B2B</span>' if g["home_b2b"] else ""
+        away_b2b_badge = '<span style="background:#ff4444;color:#fff;font-size:9px;padding:2px 5px;border-radius:2px;margin-left:4px;display:inline-block;">B2B</span>' if g["away_b2b"] else ""
+        home_b2b_badge = '<span style="background:#ff4444;color:#fff;font-size:9px;padding:2px 5px;border-radius:2px;margin-left:4px;display:inline-block;">B2B</span>' if g["home_b2b"] else ""
         dk_home = format_american(odds.get("draftkings_home"))
         fd_home = format_american(odds.get("fanduel_home"))
         mgm_home = format_american(odds.get("betmgm_home"))
@@ -388,7 +489,7 @@ def build_email_html(games_with_signals, odds_data, day_label, yesterday_results
         if any(v != "N/A" for v in [dk_home, fd_home, mgm_home, pin_home]):
             def chip(book, val):
                 if val == "N/A": return ""
-                return f'<span style="background:#1e2d38;color:#8fafc4;font-family:monospace;font-size:10px;padding:3px 7px;border-radius:3px;margin-right:4px;">{book} {val}</span>'
+                return f'<span style="background:#1e2d38;color:#8fafc4;font-family:monospace;font-size:10px;padding:3px 7px;border-radius:3px;margin-right:4px;display:inline-block;">{book} {val}</span>'
             odds_row = f'''
             <tr><td colspan="2" style="padding:2px 12px 10px;">
               <span style="font-family:monospace;font-size:9px;color:#5a7a8a;letter-spacing:1px;margin-right:8px;">HOME ML</span>
@@ -397,12 +498,12 @@ def build_email_html(games_with_signals, odds_data, day_label, yesterday_results
         return f'''
         <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;border:1px solid {border_color};border-radius:4px;background:{bg_color};">
           <tr>
-            <td style="padding:10px 12px 4px;">
-              <span style="font-family:monospace;font-size:18px;font-weight:bold;color:#e8f0f4;">{g["away"]}</span>{away_b2b_badge}
-              <span style="font-family:monospace;font-size:12px;color:#5a7a8a;margin:0 8px;">@</span>
-              <span style="font-family:monospace;font-size:18px;font-weight:bold;color:#e8f0f4;">{g["home"]}</span>{home_b2b_badge}
+            <td style="padding:10px 12px 4px;word-break:break-word;">
+              <span style="font-family:monospace;font-size:16px;font-weight:bold;color:#e8f0f4;">{g["away"]}</span>{away_b2b_badge}
+              <span style="font-family:monospace;font-size:12px;color:#5a7a8a;margin:0 6px;">@</span>
+              <span style="font-family:monospace;font-size:16px;font-weight:bold;color:#e8f0f4;">{g["home"]}</span>{home_b2b_badge}
             </td>
-            <td style="padding:10px 12px 4px;text-align:right;font-family:monospace;font-size:11px;color:#5a7a8a;">{g["time_str"]}</td>
+            <td style="padding:10px 12px 4px;text-align:right;font-family:monospace;font-size:11px;color:#5a7a8a;white-space:nowrap;">{g["time_str"]}</td>
           </tr>
           {signal_row}
           {odds_row}
@@ -417,26 +518,38 @@ def build_email_html(games_with_signals, odds_data, day_label, yesterday_results
     regular_section = ""
     if regular_games:
         regular_section = f'''
-        <tr><td style="padding:20px 24px 8px;">
+        <tr><td style="background:#0d1a24;border-left:1px solid #1e2d38;border-right:1px solid #1e2d38;padding:20px 24px 8px;">
           <p style="font-family:monospace;font-size:9px;letter-spacing:2px;color:#5a7a8a;text-transform:uppercase;margin:0 0 10px;">Tonight\'s Full Slate</p>
           {regular_games_html}
         </td></tr>'''
 
     results_section = build_results_html(yesterday_results or [], yesterday_date)
+    fantasy_section = build_fantasy_section(fantasy)
 
     html = f'''<!DOCTYPE html>
 <html>
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    @media only screen and (max-width: 600px) {{
+      .email-container {{ width: 100% !important; }}
+      .game-team {{ font-size: 14px !important; }}
+      .hide-mobile {{ display: none !important; }}
+      td {{ padding-left: 12px !important; padding-right: 12px !important; }}
+    }}
+  </style>
+</head>
 <body style="margin:0;padding:0;background:#0a0f14;font-family:sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0a0f14;min-height:100vh;">
-    <tr><td align="center" style="padding:24px 16px;">
-      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0a0f14;">
+    <tr><td align="center" style="padding:16px 8px;">
+      <table class="email-container" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
 
         <!-- HEADER -->
         <tr><td style="background:#0d1a24;border:1px solid #1e2d38;border-radius:6px 6px 0 0;padding:20px 24px;">
           <p style="font-family:monospace;font-size:9px;letter-spacing:3px;color:#00c2ff;text-transform:uppercase;margin:0 0 4px;">Ice Cold Analytics</p>
           <p style="font-family:monospace;font-size:20px;font-weight:bold;color:#e8f0f4;margin:0;">NHL Edge Report</p>
-          <p style="font-family:monospace;font-size:11px;color:#5a7a8a;margin:4px 0 0;">{day_label} · icecoldanalytics.ca</p>
+          <p style="font-family:monospace;font-size:11px;color:#5a7a8a;margin:4px 0 0;">{day_label} · <a href="https://icecoldanalytics.ca" style="color:#5a7a8a;text-decoration:none;">icecoldanalytics.ca</a></p>
         </td></tr>
 
         <!-- SIGNAL SUMMARY BAR -->
@@ -445,7 +558,7 @@ def build_email_html(games_with_signals, odds_data, day_label, yesterday_results
           <span style="font-family:monospace;font-size:10px;color:#5a7a8a;margin-left:12px;">Signal 1: B2B + rest differential (+8.7% ROI historical)</span>
         </td></tr>
 
-        <!-- LAST NIGHT'S RESULTS -->
+        <!-- LAST NIGHT\'S RESULTS -->
         {results_section}
 
         <!-- SIGNAL GAMES -->
@@ -454,10 +567,13 @@ def build_email_html(games_with_signals, odds_data, day_label, yesterday_results
         <!-- ALL OTHER GAMES -->
         {regular_section}
 
+        <!-- FANTASY PICKS -->
+        {fantasy_section}
+
         <!-- FOOTER -->
         <tr><td style="background:#0d1a24;border:1px solid #1e2d38;border-radius:0 0 6px 6px;padding:16px 24px;text-align:center;">
           <p style="font-family:monospace;font-size:9px;color:#5a7a8a;margin:0 0 6px;">
-            For full odds comparison and DFS plays → <a href="https://icecoldanalytics.ca" style="color:#00c2ff;text-decoration:none;">icecoldanalytics.ca</a>
+            Full dashboard, live scores + DFS tools → <a href="https://icecoldanalytics.ca" style="color:#00c2ff;text-decoration:none;">icecoldanalytics.ca</a>
           </p>
           <p style="font-family:monospace;font-size:8px;color:#2a3d4a;margin:0;">
             Ice Cold Analytics · Statistical analysis for research purposes only · Not betting advice ·
@@ -471,7 +587,6 @@ def build_email_html(games_with_signals, odds_data, day_label, yesterday_results
 </body>
 </html>'''
     return html
-
 # ── BUILD PLAIN TEXT VERSION ──────────────────────────────────────────────────
 def build_email_text(games_with_signals, day_label, yesterday_results=None, yesterday_date=""):
     lines = [
@@ -591,7 +706,8 @@ def main():
     # 6. Build email
     print("Building email...")
     subject = f"⚡ NHL Edge Report — {day_label}" if n_signals > 0 else f"NHL Edge Report — {day_label}"
-    html_content = build_email_html(games_with_signals, odds_data, day_label, yesterday_results, yesterday_date)
+    fantasy = fetch_fantasy_picks()
+    html_content = build_email_html(games_with_signals, odds_data, day_label, yesterday_results, yesterday_date, fantasy=fantasy)
     text_content = build_email_text(games_with_signals, day_label, yesterday_results, yesterday_date)
 
     # 7. Get recipients
