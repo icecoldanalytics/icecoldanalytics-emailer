@@ -531,10 +531,11 @@ def get_brevo_contacts():
 def send_email(to_emails, subject, html_content, text_content):
     url = "https://api.brevo.com/v3/smtp/email"
     headers = {"api-key": BREVO_API_KEY, "Content-Type": "application/json"}
-    to_list = [{"email": email} for email in to_emails]
+    bcc_list = [{"email": email} for email in to_emails]
     payload = {
         "sender": {"name": FROM_NAME, "email": FROM_EMAIL},
-        "to": to_list,
+        "to": [{"email": FROM_EMAIL}],
+        "bcc": bcc_list,
         "subject": subject,
         "htmlContent": html_content,
         "textContent": text_content
