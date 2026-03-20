@@ -482,45 +482,44 @@ def build_email_html(games_with_signals, odds_data, day_label, yesterday_results
 
     def game_row(g, highlight=False):
         odds = match_odds(g, odds_data)
-        away_b2b_badge = '<span style="background:#ff4444;color:#fff;font-size:9px;padding:2px 5px;border-radius:2px;margin-left:4px;display:inline-block;">B2B</span>' if g["away_b2b"] else ""
-        home_b2b_badge = '<span style="background:#ff4444;color:#fff;font-size:9px;padding:2px 5px;border-radius:2px;margin-left:4px;display:inline-block;">B2B</span>' if g["home_b2b"] else ""
+        away_b2b_badge = '<span style="background:#ff4444;color:#fff;font-family:Arial,sans-serif;font-size:10px;font-weight:bold;padding:3px 7px;border-radius:3px;margin-left:6px;display:inline-block;">B2B</span>' if g["away_b2b"] else ""
+        home_b2b_badge = '<span style="background:#ff4444;color:#fff;font-family:Arial,sans-serif;font-size:10px;font-weight:bold;padding:3px 7px;border-radius:3px;margin-left:6px;display:inline-block;">B2B</span>' if g["home_b2b"] else ""
         dk_home = format_american(odds.get("draftkings_home"))
         fd_home = format_american(odds.get("fanduel_home"))
         mgm_home = format_american(odds.get("betmgm_home"))
         pin_home = format_american(odds.get("pinnacle_home"))
-        border_color = "#ff4444" if highlight == "HIGH" else "#ffb020" if highlight == "MID" else "#1e2d38"
-        bg_color = "rgba(255,68,68,0.05)" if highlight == "HIGH" else "rgba(255,176,32,0.05)" if highlight == "MID" else "transparent"
+        border_color = "#ff4444" if highlight == "HIGH" else "#ffb020" if highlight == "MID" else "#2a3d4a"
+        bg_color = "rgba(255,68,68,0.08)" if highlight == "HIGH" else "rgba(255,176,32,0.08)" if highlight == "MID" else "#111d27"
         signal_row = ""
         if g["signal"] in ("HIGH", "MID"):
             badge_bg = "#ff4444" if g["signal"] == "HIGH" else "#ffb020"
             signal_row = f'''
-            <tr><td colspan="2" style="padding:6px 12px 10px;font-family:monospace;font-size:11px;color:{badge_bg};">
+            <tr><td colspan="2" style="padding:4px 14px 10px;font-family:Arial,sans-serif;font-size:13px;font-weight:bold;color:{badge_bg};">
               {g["signal_label"]} — {g["signal_detail"]}
             </td></tr>'''
         odds_row = ""
         if any(v != "N/A" for v in [dk_home, fd_home, mgm_home, pin_home]):
             def chip(book, val):
                 if val == "N/A": return ""
-                return f'<span style="background:#1e2d38;color:#8fafc4;font-family:monospace;font-size:10px;padding:3px 7px;border-radius:3px;margin-right:4px;display:inline-block;">{book} {val}</span>'
+                return f'<span style="background:#1e2d38;color:#adc8d8;font-family:Arial,sans-serif;font-size:11px;padding:4px 8px;border-radius:3px;margin-right:4px;display:inline-block;">{book} {val}</span>'
             odds_row = f'''
-            <tr><td colspan="2" style="padding:2px 12px 10px;">
-              <span style="font-family:monospace;font-size:9px;color:#5a7a8a;letter-spacing:1px;margin-right:8px;">HOME ML</span>
+            <tr><td colspan="2" style="padding:2px 14px 10px;">
+              <span style="font-family:Arial,sans-serif;font-size:11px;color:#8fafc4;font-weight:bold;margin-right:8px;">HOME ML</span>
               {chip("DK", dk_home)}{chip("FD", fd_home)}{chip("MGM", mgm_home)}{chip("PIN", pin_home)}
             </td></tr>'''
         return f'''
-        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;border:1px solid {border_color};border-radius:4px;background:{bg_color};">
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;border:1px solid {border_color};border-radius:6px;background:{bg_color};">
           <tr>
-            <td style="padding:10px 12px 4px;word-break:break-word;">
-              <span style="font-family:monospace;font-size:16px;font-weight:bold;color:#e8f0f4;">{g["away"]}</span>{away_b2b_badge}
-              <span style="font-family:monospace;font-size:12px;color:#5a7a8a;margin:0 6px;">@</span>
-              <span style="font-family:monospace;font-size:16px;font-weight:bold;color:#e8f0f4;">{g["home"]}</span>{home_b2b_badge}
+            <td style="padding:12px 14px 4px;word-break:break-word;">
+              <span style="font-family:Arial,sans-serif;font-size:17px;font-weight:bold;color:#ffffff;">{g["away"]}</span>{away_b2b_badge}
+              <span style="font-family:Arial,sans-serif;font-size:14px;color:#8fafc4;margin:0 8px;">@</span>
+              <span style="font-family:Arial,sans-serif;font-size:17px;font-weight:bold;color:#ffffff;">{g["home"]}</span>{home_b2b_badge}
             </td>
-            <td style="padding:10px 12px 4px;text-align:right;font-family:monospace;font-size:11px;color:#5a7a8a;white-space:nowrap;">{g["time_str"]}</td>
+            <td style="padding:12px 14px 4px;text-align:right;font-family:Arial,sans-serif;font-size:12px;color:#adc8d8;white-space:nowrap;">{g["time_str"]}</td>
           </tr>
           {signal_row}
           {odds_row}
         </table>'''
-
     n_signals = len(signal_games)
     signal_summary = f"{n_signals} signal game{'s' if n_signals != 1 else ''} tonight" if n_signals > 0 else "No high-confidence signals tonight"
     signal_color = "#ff4444" if n_signals > 0 else "#5a7a8a"
@@ -531,7 +530,7 @@ def build_email_html(games_with_signals, odds_data, day_label, yesterday_results
     if regular_games:
         regular_section = f'''
         <tr><td style="background:#0d1a24;border-left:1px solid #1e2d38;border-right:1px solid #1e2d38;padding:20px 24px 8px;">
-          <p style="font-family:monospace;font-size:9px;letter-spacing:2px;color:#5a7a8a;text-transform:uppercase;margin:0 0 10px;">Tonight\'s Full Slate</p>
+         <p style="font-family:Arial,sans-serif;font-size:11px;font-weight:bold;letter-spacing:2px;color:#8fafc4;text-transform:uppercase;margin:0 0 12px;">Tonight\'s Full Slate</p>
           {regular_games_html}
         </td></tr>'''
 
