@@ -335,32 +335,39 @@ def build_results_html(yesterday_results, yesterday_date):
     rows = ""
     for r in yesterday_results:
         icon = "✅" if r["fade_won"] is True else "❌" if r["fade_won"] is False else "·"
-        result_color = "#00ff88" if r["fade_won"] is True else "#ff4444" if r["fade_won"] is False else "#5a7a8a"
+        result_color = "#00ff88" if r["fade_won"] is True else "#ff4444" if r["fade_won"] is False else "#8fafc4"
         result_word = "WIN" if r["fade_won"] is True else "LOSS" if r["fade_won"] is False else "NO SIGNAL"
-        fade_note = f"Fade {r['away']} ({'B2B' if r['away_b2b'] else ''}) · Home rested {r['home_rest']}d"
+        border_color = "#00ff88" if r["fade_won"] is True else "#ff4444" if r["fade_won"] is False else "#2a3d4a"
+
+        if r["signal_label"] != "No Signal":
+            fade_note = f"{r['signal_label']} · Fade {r['away']}{'  (B2B)' if r['away_b2b'] else ''} · Home rested {r['home_rest']}d"
+        else:
+            fade_note = "No signal"
+
         rows += f'''
-        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;border:1px solid #1e2d38;border-radius:4px;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;border:1px solid {border_color};border-radius:6px;background:#111d27;">
           <tr>
-            <td style="padding:10px 12px 4px;">
-              <span style="font-family:monospace;font-size:15px;font-weight:bold;color:#e8f0f4;">{r["away"]} @ {r["home"]}</span>
-              <span style="font-family:monospace;font-size:11px;color:#5a7a8a;margin-left:8px;">{r["score_str"].split("—")[0].strip()} — {r["score_str"].split("—")[1].strip()}</span>
+            <td style="padding:12px 14px 4px;">
+              <span style="font-family:Arial,sans-serif;font-size:16px;font-weight:bold;color:#ffffff;">{r["away"]} @ {r["home"]}</span>
+              <span style="font-family:Arial,sans-serif;font-size:13px;color:#adc8d8;margin-left:8px;">{r["score_str"]}</span>
             </td>
-            <td style="padding:10px 12px 4px;text-align:right;">
-              <span style="font-family:monospace;font-size:12px;font-weight:bold;color:{result_color};">{icon} {result_word}</span>
+            <td style="padding:12px 14px 4px;text-align:right;white-space:nowrap;">
+              <span style="font-family:Arial,sans-serif;font-size:13px;font-weight:bold;color:{result_color};">{icon} {result_word}</span>
             </td>
           </tr>
           <tr>
-            <td colspan="2" style="padding:2px 12px 10px;font-family:monospace;font-size:10px;color:#5a7a8a;">
-              {r["signal_label"]} · {fade_note}
+            <td colspan="2" style="padding:2px 14px 12px;font-family:Arial,sans-serif;font-size:12px;color:#8fafc4;">
+              {fade_note}
             </td>
           </tr>
         </table>'''
 
     return f'''
-    <tr><td style="background:#0d1a24;border-left:1px solid #1e2d38;border-right:1px solid #1e2d38;padding:16px 24px 8px;">
-      <p style="font-family:monospace;font-size:9px;letter-spacing:2px;color:#00c2ff;text-transform:uppercase;margin:0 0 10px;">📊 Last Night's Results — {date_label}</p>
+    <tr><td style="background:#0d1a24;border-left:1px solid #1e2d38;border-right:1px solid #1e2d38;padding:16px 20px 8px;">
+      <p style="font-family:Arial,sans-serif;font-size:11px;font-weight:bold;letter-spacing:2px;color:#00c2ff;text-transform:uppercase;margin:0 0 12px;">📊 Last Night's Results — {date_label}</p>
       {rows}
     </td></tr>'''
+
 
 def fetch_fantasy_picks():
     """Fetch today's fantasy picks from the live site"""
@@ -372,15 +379,16 @@ def fetch_fantasy_picks():
         print(f"Fantasy fetch error: {e}")
         return None
 
+
 def build_fantasy_section(fantasy):
     """Build a condensed fantasy picks section for email"""
     if not fantasy:
         return ""
-    
+
     vp = fantasy.get("value_plays", {})
-    plays = vp.get("plays", [])[:5]  # Top 5 plays only
+    plays = vp.get("plays", [])[:5]
     pp = fantasy.get("player_props", {})
-    props = pp.get("props", [])[:4]  # Top 4 props
+    props = pp.get("props", [])[:4]
     gs = fantasy.get("goalie_starts", {})
     goalies = [g for g in gs.get("goalies", []) if g.get("recommendation") == "start"][:2]
 
@@ -390,77 +398,81 @@ def build_fantasy_section(fantasy):
     plays_html = ""
     for p in plays:
         tier_color = "#ffb020" if p["tier"] == "S" else "#00c2ff" if p["tier"] == "A" else "#00ff88"
-        tags_html = " ".join(f'<span style="background:#1e2d38;color:#8fafc4;font-size:9px;padding:2px 5px;border-radius:2px;margin-right:3px;">{t}</span>' for t in p.get("tags", []))
+        tags_html = " ".join(f'<span style="background:#1e2d38;color:#adc8d8;font-family:Arial,sans-serif;font-size:10px;padding:3px 7px;border-radius:3px;margin-right:3px;">{t}</span>' for t in p.get("tags", []))
         plays_html += f'''
-        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:6px;border:1px solid #1e2d38;border-radius:4px;background:#0d1a24;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;border:1px solid #2a3d4a;border-radius:6px;background:#111d27;">
           <tr>
-            <td style="padding:8px 12px;">
-              <span style="background:{tier_color};color:#000;font-family:monospace;font-size:9px;font-weight:bold;padding:2px 5px;border-radius:2px;margin-right:6px;">{p["tier"]}</span>
-              <span style="font-family:monospace;font-size:13px;font-weight:bold;color:#e8f0f4;">{p["player"]}</span>
-              <span style="font-family:monospace;font-size:10px;color:#5a7a8a;margin-left:6px;">{p["team"]} · {p["position"]} · {p["matchup"]}</span>
+            <td style="padding:12px 14px 4px;">
+              <span style="background:{tier_color};color:#000;font-family:Arial,sans-serif;font-size:10px;font-weight:bold;padding:3px 7px;border-radius:3px;margin-right:8px;">{p["tier"]}-TIER</span>
+              <span style="font-family:Arial,sans-serif;font-size:15px;font-weight:bold;color:#ffffff;">{p["player"]}</span>
             </td>
-            <td style="padding:8px 12px;text-align:right;white-space:nowrap;">
-              <span style="font-family:monospace;font-size:10px;color:#8fafc4;">DK {p["dk_salary"]}</span>
-              <span style="font-family:monospace;font-size:10px;color:#5a7a8a;margin:0 4px;">·</span>
-              <span style="font-family:monospace;font-size:10px;color:#8fafc4;">FD {p["fd_salary"]}</span>
+            <td style="padding:12px 14px 4px;text-align:right;white-space:nowrap;">
+              <span style="font-family:Arial,sans-serif;font-size:12px;color:#adc8d8;">DK {p["dk_salary"]}</span>
             </td>
           </tr>
           <tr>
-            <td colspan="2" style="padding:0 12px 8px;">
-              <span style="font-family:monospace;font-size:10px;color:#5a7a8a;">{p["reason"][:120]}{"..." if len(p["reason"]) > 120 else ""}</span>
+            <td colspan="2" style="padding:2px 14px 6px;">
+              <span style="font-family:Arial,sans-serif;font-size:12px;color:#adc8d8;">{p["team"]} · {p["position"]} · {p["matchup"]} · {p["game_time"]}</span>
             </td>
           </tr>
           <tr>
-            <td colspan="2" style="padding:0 12px 8px;">{tags_html}</td>
+            <td colspan="2" style="padding:2px 14px 8px;">
+              <span style="font-family:Arial,sans-serif;font-size:12px;color:#c8dce8;">{p["reason"][:140]}{"..." if len(p["reason"]) > 140 else ""}</span>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="2" style="padding:0 14px 10px;">{tags_html}</td>
           </tr>
         </table>'''
 
     props_html = ""
     for p in props:
         pick_color = "#00ff88" if p["pick"] == "over" else "#ff4444" if p["pick"] == "under" else "#00c2ff"
+        pick_bg = "rgba(0,255,136,0.15)" if p["pick"] == "over" else "rgba(255,68,68,0.15)" if p["pick"] == "under" else "rgba(0,194,255,0.15)"
         props_html += f'''
-        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:6px;border:1px solid #1e2d38;border-radius:4px;background:#0d1a24;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;border:1px solid #2a3d4a;border-radius:6px;background:#111d27;">
           <tr>
-            <td style="padding:8px 12px;">
-              <span style="font-family:monospace;font-size:13px;font-weight:bold;color:#e8f0f4;">{p["player"]}</span>
-              <span style="font-family:monospace;font-size:10px;color:#5a7a8a;margin-left:6px;">— {p["prop_type"]}</span>
+            <td style="padding:12px 14px 4px;">
+              <span style="font-family:Arial,sans-serif;font-size:15px;font-weight:bold;color:#ffffff;">{p["player"]}</span>
+              <span style="font-family:Arial,sans-serif;font-size:12px;color:#adc8d8;margin-left:6px;">— {p["prop_type"]}</span>
             </td>
-            <td style="padding:8px 12px;text-align:right;white-space:nowrap;">
-              <span style="color:{pick_color};font-family:monospace;font-size:11px;font-weight:bold;">{p["pick"].upper()} {p["line"]}</span>
-              <span style="font-family:monospace;font-size:10px;color:#8fafc4;margin-left:6px;">{p["odds"]}</span>
+            <td style="padding:12px 14px 4px;text-align:right;white-space:nowrap;">
+              <span style="background:{pick_bg};color:{pick_color};font-family:Arial,sans-serif;font-size:12px;font-weight:bold;padding:4px 8px;border-radius:4px;">{p["pick"].upper()} {p["line"]}</span>
+              <span style="font-family:Arial,sans-serif;font-size:12px;color:#adc8d8;margin-left:6px;">{p["odds"]}</span>
             </td>
           </tr>
           <tr>
-            <td colspan="2" style="padding:0 12px 8px;font-family:monospace;font-size:10px;color:#5a7a8a;">{p["reason"][:120]}{"..." if len(p["reason"]) > 120 else ""}</td>
+            <td colspan="2" style="padding:2px 14px 10px;font-family:Arial,sans-serif;font-size:12px;color:#c8dce8;">{p["reason"][:140]}{"..." if len(p["reason"]) > 140 else ""}</td>
           </tr>
         </table>'''
 
     goalies_html = ""
     for g in goalies:
         goalies_html += f'''
-        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:6px;border:1px solid #1e2d38;border-radius:4px;background:#0d1a24;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;border:1px solid #2a3d4a;border-radius:6px;background:#111d27;">
           <tr>
-            <td style="padding:8px 12px;">
-              <span style="background:#00ff88;color:#000;font-family:monospace;font-size:9px;font-weight:bold;padding:2px 5px;border-radius:2px;margin-right:6px;">▲ Start</span>
-              <span style="font-family:monospace;font-size:13px;font-weight:bold;color:#e8f0f4;">{g["name"]}</span>
-              <span style="font-family:monospace;font-size:10px;color:#5a7a8a;margin-left:6px;">{g["team"]} vs {g["opponent"]}</span>
+            <td style="padding:12px 14px 4px;">
+              <span style="background:#00ff88;color:#000;font-family:Arial,sans-serif;font-size:10px;font-weight:bold;padding:3px 7px;border-radius:3px;margin-right:8px;">▲ START</span>
+              <span style="font-family:Arial,sans-serif;font-size:15px;font-weight:bold;color:#ffffff;">{g["name"]}</span>
             </td>
-            <td style="padding:8px 12px;text-align:right;white-space:nowrap;">
-              <span style="font-family:monospace;font-size:10px;color:#8fafc4;">{g["sv_pct"]} SV% · {g["gaa"]} GAA</span>
+            <td style="padding:12px 14px 4px;text-align:right;white-space:nowrap;">
+              <span style="font-family:Arial,sans-serif;font-size:12px;color:#adc8d8;">{g["sv_pct"]} SV%</span>
             </td>
           </tr>
-          {f'<tr><td colspan="2" style="padding:0 12px 8px;font-family:monospace;font-size:10px;color:#ffb020;">{g["signal_note"]}</td></tr>' if g.get("signal_note") else ""}
+          <tr>
+            <td colspan="2" style="padding:2px 14px 10px;font-family:Arial,sans-serif;font-size:12px;color:#adc8d8;">{g["team"]} vs {g["opponent"]} · {g["gaa"]} GAA{(" · " + g["signal_note"]) if g.get("signal_note") else ""}</td>
+          </tr>
         </table>'''
 
     return f'''
         <!-- FANTASY PICKS -->
-        <tr><td style="background:#0d1a24;border-left:1px solid #1e2d38;border-right:1px solid #1e2d38;padding:16px 24px 8px;">
-          <p style="font-family:monospace;font-size:9px;letter-spacing:2px;color:#00c2ff;text-transform:uppercase;margin:0 0 10px;">🏒 Top Fantasy Plays · {fantasy.get("date_label","")}</p>
+        <tr><td style="background:#0d1a24;border-left:1px solid #1e2d38;border-right:1px solid #1e2d38;padding:16px 20px 8px;">
+          <p style="font-family:Arial,sans-serif;font-size:11px;font-weight:bold;letter-spacing:2px;color:#00c2ff;text-transform:uppercase;margin:0 0 12px;">🏒 Top Fantasy Plays · {fantasy.get("date_label","")}</p>
           {plays_html}
-          <p style="font-family:monospace;font-size:9px;letter-spacing:2px;color:#5a7a8a;text-transform:uppercase;margin:12px 0 8px;">📊 Top Props</p>
+          <p style="font-family:Arial,sans-serif;font-size:11px;font-weight:bold;letter-spacing:2px;color:#8fafc4;text-transform:uppercase;margin:16px 0 10px;">📊 Top Props</p>
           {props_html}
-          {"<p style='font-family:monospace;font-size:9px;letter-spacing:2px;color:#5a7a8a;text-transform:uppercase;margin:12px 0 8px;'>🥅 Goalie Starts</p>" + goalies_html if goalies_html else ""}
-          <p style="font-family:monospace;font-size:10px;color:#5a7a8a;margin:8px 0 0;">Full picks + goalie table → <a href="https://icecoldanalytics.ca" style="color:#00c2ff;text-decoration:none;">icecoldanalytics.ca</a></p>
+          {"<p style='font-family:Arial,sans-serif;font-size:11px;font-weight:bold;letter-spacing:2px;color:#8fafc4;text-transform:uppercase;margin:16px 0 10px;'>🥅 Goalie Starts</p>" + goalies_html if goalies_html else ""}
+          <p style="font-family:Arial,sans-serif;font-size:12px;color:#8fafc4;margin:10px 0 0;">Full picks + goalie table → <a href="https://icecoldanalytics.ca" style="color:#00c2ff;text-decoration:none;font-weight:bold;">icecoldanalytics.ca</a></p>
         </td></tr>'''
 
 # ── BUILD EMAIL HTML ──────────────────────────────────────────────────────────
