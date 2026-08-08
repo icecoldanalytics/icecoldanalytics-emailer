@@ -15,7 +15,7 @@ import pytz
 BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "YOUR_BREVO_API_KEY_HERE")
 ODDS_API_KEY  = os.environ.get("ODDS_API_KEY", "YOUR_ODDS_API_KEY_HERE")
 FROM_EMAIL    = "info@icecoldanalytics.ca"
-FROM_NAME     = "Ice Cold Analytics"
+FROM_NAME     = "Grind Line""
 SEND_TO_LIST_ID = None
 
 # ── TIMEZONE ──────────────────────────────────────────────────────────────────
