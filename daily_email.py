@@ -372,7 +372,7 @@ def build_results_html(yesterday_results, yesterday_date):
 def fetch_fantasy_picks():
     """Fetch today's fantasy picks from the live site"""
     try:
-        r = requests.get("https://icecoldanalytics.ca/data/fantasy.json", timeout=10)
+       r = requests.get("https://www.grindline.ca/data/fantasy.json", timeout=10)
         r.raise_for_status()
         return r.json()
     except Exception as e:
