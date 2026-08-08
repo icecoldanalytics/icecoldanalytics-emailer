@@ -472,7 +472,7 @@ def build_fantasy_section(fantasy):
           <p style="font-family:Arial,sans-serif;font-size:11px;font-weight:bold;letter-spacing:2px;color:#8fafc4;text-transform:uppercase;margin:16px 0 10px;">📊 Top Props</p>
           {props_html}
           {"<p style='font-family:Arial,sans-serif;font-size:11px;font-weight:bold;letter-spacing:2px;color:#8fafc4;text-transform:uppercase;margin:16px 0 10px;'>🥅 Goalie Starts</p>" + goalies_html if goalies_html else ""}
-          <p style="font-family:Arial,sans-serif;font-size:12px;color:#8fafc4;margin:10px 0 0;">Full picks + goalie table → <a href="https://icecoldanalytics.ca" style="color:#00c2ff;text-decoration:none;font-weight:bold;">icecoldanalytics.ca</a></p>
+          <p style="font-family:Arial,sans-serif;font-size:12px;color:#8fafc4;margin:10px 0 0;">Full picks + goalie table → <a href="https://grindline.ca" style="color:#00c2ff;text-decoration:none;font-weight:bold;">icecoldanalytics.ca</a></p>
         </td></tr>'''
 
 # ── BUILD EMAIL HTML ──────────────────────────────────────────────────────────
@@ -560,7 +560,7 @@ def build_email_html(games_with_signals, odds_data, day_label, yesterday_results
         <tr><td style="background:#0d1a24;border:1px solid #1e2d38;border-radius:6px 6px 0 0;padding:20px 24px;">
           <p style="font-family:monospace;font-size:9px;letter-spacing:3px;color:#00c2ff;text-transform:uppercase;margin:0 0 4px;">Ice Cold Analytics</p>
           <p style="font-family:monospace;font-size:20px;font-weight:bold;color:#e8f0f4;margin:0;">NHL Edge Report</p>
-          <p style="font-family:monospace;font-size:11px;color:#5a7a8a;margin:4px 0 0;">{day_label} · <a href="https://icecoldanalytics.ca" style="color:#5a7a8a;text-decoration:none;">icecoldanalytics.ca</a></p>
+          <p style="font-family:monospace;font-size:11px;color:#5a7a8a;margin:4px 0 0;">{day_label} · <a href="https://grindline.ca" style="color:#5a7a8a;text-decoration:none;">icecoldanalytics.ca</a></p>
         </td></tr>
 
         <!-- SIGNAL SUMMARY BAR -->
@@ -584,7 +584,7 @@ def build_email_html(games_with_signals, odds_data, day_label, yesterday_results
         <!-- FOOTER -->
         <tr><td style="background:#0d1a24;border:1px solid #1e2d38;border-radius:0 0 6px 6px;padding:16px 24px;text-align:center;">
           <p style="font-family:monospace;font-size:9px;color:#5a7a8a;margin:0 0 6px;">
-            Full dashboard, live scores + DFS tools → <a href="https://icecoldanalytics.ca" style="color:#00c2ff;text-decoration:none;">icecoldanalytics.ca</a>
+            Full dashboard, live scores + DFS tools → <a href="https://grindline.ca" style="color:#00c2ff;text-decoration:none;">icecoldanalytics.ca</a>
           </p>
           <p style="font-family:monospace;font-size:8px;color:#2a3d4a;margin:0;">
             Ice Cold Analytics · Statistical analysis for research purposes only · Not betting advice ·
@@ -631,7 +631,7 @@ def build_email_text(games_with_signals, day_label, yesterday_results=None, yest
         b2b = " [B2B]" if g["away_b2b"] or g["home_b2b"] else ""
         lines.append(f"  {g['away']} @ {g['home']} — {g['time_str']}{b2b}")
 
-    lines += ["", "icecoldanalytics.ca", "Not betting advice — for research purposes only"]
+    lines += ["", "grindline.ca", "Not betting advice — for research purposes only"]
     return "\n".join(lines)
 
 # ── FETCH BREVO CONTACTS ──────────────────────────────────────────────────────
