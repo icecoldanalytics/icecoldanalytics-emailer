@@ -370,14 +370,18 @@ def build_results_html(yesterday_results, yesterday_date):
 
 
 def fetch_fantasy_picks():
-    """Fetch today's fantasy picks from the live site"""
+    """Read fantasy picks from the repo, but only if they're today's."""
     try:
-       r = requests.get("https://www.grindline.ca/data/fantasy.json", timeout=10)
-        r.raise_for_status()
-        return r.json()
+        with open("data/fantasy.json") as f:
+            data = json.load(f)
     except Exception as e:
-        print(f"Fantasy fetch error: {e}")
+        print(f"Fantasy read error: {e}")
         return None
+    today = datetime.now(MST).strftime("%Y-%m-%d")
+    if data.get("date") != today:
+        print(f"Fantasy data is stale ({data.get('date')}) - omitting section")
+        return None
+    return data
 
 
 def build_fantasy_section(fantasy):
