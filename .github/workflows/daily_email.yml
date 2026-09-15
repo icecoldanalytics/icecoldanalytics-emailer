@@ -1,10 +1,8 @@
 name: NHL Daily Edge Email
 on:
   schedule:
-    # 7:00 AM MST = 14:00 UTC (during standard time)
-    # 7:00 AM MDT = 13:00 UTC (during daylight saving time)
-    # Running at both to cover the seasonal switch:
-    - cron: '0 14 * * *'
+    # Disabled until Rest Edge rebuild lands
+    # - cron: '0 14 * * *'
   workflow_dispatch:  # Allows manual trigger from GitHub Actions UI for testing
 
 jobs:
