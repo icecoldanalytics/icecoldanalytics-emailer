@@ -294,7 +294,7 @@ def detect_signals(games, b2b_teams, played_yesterday, played_two_days_ago):
         if away_b2b and not home_b2b and home_rest >= 3:
             signal = "HIGH"
             signal_label = "⚡ SIGNAL 1 ACTIVE"
-            signal_detail = f"{away} on B2B · {home} rested {home_rest}+ days · +8.7% ROI historical"
+            signal_detail = f"{away} on B2B · {home} rested {home_rest}+ days ·"
         elif away_b2b and not home_b2b and home_rest == 2:
             signal = "MID"
             signal_label = "⚠ SIGNAL 1 PARTIAL"
@@ -570,7 +570,7 @@ def build_email_html(games_with_signals, odds_data, day_label, yesterday_results
         <!-- SIGNAL SUMMARY BAR -->
         <tr><td style="background:#111d27;border-left:1px solid #1e2d38;border-right:1px solid #1e2d38;padding:12px 24px;">
           <span style="font-family:monospace;font-size:12px;color:{signal_color};font-weight:bold;">{signal_summary}</span>
-          <span style="font-family:monospace;font-size:10px;color:#5a7a8a;margin-left:12px;">Signal 1: B2B + rest differential (+8.7% ROI historical)</span>
+          <span style="font-family:monospace;font-size:10px;color:#5a7a8a;margin-left:12px;">Signal 1: B2B + rest differential </span>
         </td></tr>
 
         <!-- LAST NIGHT\'S RESULTS -->
