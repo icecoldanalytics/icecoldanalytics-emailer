@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Grind Line — Daily NHL Edge Report
-Runs every morning at 7:00 AM MST
+Runs every morning at 7:00 AM MDT
 Fetches tonight's NHL schedule, checks B2B situations, pulls lines, sends email via Brevo
 """
 
@@ -14,7 +14,7 @@ import pytz
 # ── CONFIG ────────────────────────────────────────────────────────────────────
 BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "YOUR_BREVO_API_KEY_HERE")
 ODDS_API_KEY  = os.environ.get("ODDS_API_KEY", "YOUR_ODDS_API_KEY_HERE")
-FROM_EMAIL    = "info@icecoldanalytics.ca"
+FROM_EMAIL    = "hello@grindline.ca"
 FROM_NAME     = "Grind Line""
 SEND_TO_LIST_ID = None
 
