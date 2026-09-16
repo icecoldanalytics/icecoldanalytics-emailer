@@ -16,7 +16,7 @@ BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "YOUR_BREVO_API_KEY_HERE")
 ODDS_API_KEY  = os.environ.get("ODDS_API_KEY", "YOUR_ODDS_API_KEY_HERE")
 FROM_EMAIL    = "hello@grindline.ca"
 FROM_NAME     = "Grind Line""
-SEND_TO_LIST_ID = None
+
 
 # ── TIMEZONE ──────────────────────────────────────────────────────────────────
 MST = pytz.timezone("America/Edmonton")
@@ -562,7 +562,7 @@ def build_email_html(games_with_signals, odds_data, day_label, yesterday_results
 
         <!-- HEADER -->
         <tr><td style="background:#0d1a24;border:1px solid #1e2d38;border-radius:6px 6px 0 0;padding:20px 24px;">
-          <p style="font-family:monospace;font-size:9px;letter-spacing:3px;color:#00c2ff;text-transform:uppercase;margin:0 0 4px;">Ice Cold Analytics</p>
+          <p style="font-family:monospace;font-size:9px;letter-spacing:3px;color:#00c2ff;text-transform:uppercase;margin:0 0 4px;">Grind Line</p>
           <p style="font-family:monospace;font-size:20px;font-weight:bold;color:#e8f0f4;margin:0;">NHL Edge Report</p>
           <p style="font-family:monospace;font-size:11px;color:#5a7a8a;margin:4px 0 0;">{day_label} · <a href="https://grindline.ca" style="color:#5a7a8a;text-decoration:none;">grindline.ca</a></p>
         </td></tr>
@@ -591,7 +591,7 @@ def build_email_html(games_with_signals, odds_data, day_label, yesterday_results
             Full dashboard, live scores + DFS tools → <a href="https://grindline.ca" style="color:#00c2ff;text-decoration:none;">grindline.ca</a>
           </p>
           <p style="font-family:monospace;font-size:8px;color:#2a3d4a;margin:0;">
-            Ice Cold Analytics · Statistical analysis for research purposes only · Not betting advice ·
+            Grind Line · Statistical analysis for research purposes only · Not betting advice ·
             <a href="*|UNSUBSCRIBE|*" style="color:#2a3d4a;">Unsubscribe</a>
           </p>
         </td></tr>
@@ -605,7 +605,7 @@ def build_email_html(games_with_signals, odds_data, day_label, yesterday_results
 # ── BUILD PLAIN TEXT VERSION ──────────────────────────────────────────────────
 def build_email_text(games_with_signals, day_label, yesterday_results=None, yesterday_date=""):
     lines = [
-        f"ICE COLD ANALYTICS — NHL Edge Report — {day_label}",
+        f"Grind Line — NHL Edge Report — {day_label}",
         "=" * 50,
         ""
     ]
@@ -684,7 +684,7 @@ def send_email(to_emails, subject, html_content, text_content):
 # ── MAIN ──────────────────────────────────────────────────────────────────────
 def main():
     print(f"\n{'='*50}")
-    print(f"Ice Cold Analytics — Daily Email — {datetime.now(MST).strftime('%Y-%m-%d %H:%M MST')}")
+    print(f"Grind Line — Daily Email — {datetime.now(MST).strftime('%Y-%m-%d %H:%M MST')}")
     print(f"{'='*50}\n")
 
     day_label, today_str = get_today_str()
