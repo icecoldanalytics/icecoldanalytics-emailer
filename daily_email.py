@@ -668,18 +668,31 @@ def build_email_text(games_with_signals, day_label, yesterday_results=None, yest
 
 # ── FETCH BREVO CONTACTS ──────────────────────────────────────────────────────
 def get_brevo_contacts():
-    url = "https://api.brevo.com/v3/contacts"
+    """GET /v3/contacts?listId=N does NOT filter by list - listId is
+    silently ignored on that endpoint and it returns every contact in the
+    account. Confirmed the hard way: the last send went to all 9 contacts
+    on the account instead of the 1 actually on list 5. The endpoint that
+    actually filters by list is GET /v3/contacts/lists/{listId}/contacts
+    (see https://developers.brevo.com/reference/getcontactsfromlist)."""
+    list_id = os.environ.get("BREVO_LIST_ID")
+    if not list_id:
+        print("BREVO_LIST_ID not set - refusing to fall back to the whole account")
+        return []
     headers = {"api-key": BREVO_API_KEY, "Content-Type": "application/json"}
+    emails = []
+    offset = 0
+    limit = 100
     try:
-        list_id = os.environ.get("BREVO_LIST_ID")
-        params = {"limit": 100}
-        if list_id:
-            params["listId"] = int(list_id)
-        r = requests.get(url, headers=headers, params=params, timeout=10)
-        r.raise_for_status()
-        contacts = r.json().get("contacts", [])
-        emails = [c["email"] for c in contacts if c.get("email")]
-        print(f"Found {len(emails)} contacts: {emails}")
+        while True:
+            url = f"https://api.brevo.com/v3/contacts/lists/{list_id}/contacts"
+            r = requests.get(url, headers=headers, params={"limit": limit, "offset": offset}, timeout=10)
+            r.raise_for_status()
+            contacts = r.json().get("contacts", [])
+            emails.extend(c["email"] for c in contacts if c.get("email"))
+            if len(contacts) < limit:
+                break
+            offset += limit
+        print(f"Found {len(emails)} contact(s) on list {list_id}: {emails}")
         return emails
     except Exception as e:
         print(f"Brevo contacts error: {e}")
