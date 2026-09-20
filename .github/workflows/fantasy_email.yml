@@ -1,12 +1,15 @@
-name: Rest Edge Email
+name: Fantasy Picks Email
 on:
   workflow_dispatch:  # Manual trigger for testing
   # Cron disabled until we've verified a real send:
   # schedule:
-  #   - cron: '0 14 * * *'
+  #   - cron: '30 17 * * *'
+  # Runs 30 minutes after grindline's fantasy pipeline writes fantasy.json
+  # (its own cron is 17:00 UTC), so the date guard in fetch_fantasy_picks
+  # should pass under normal operation.
 
 jobs:
-  send-rest-edge-email:
+  send-fantasy-email:
     runs-on: ubuntu-latest
 
     steps:
@@ -24,7 +27,6 @@ jobs:
       - name: Run daily email script
         env:
           BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
-          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
           BREVO_LIST_ID: '5'
-          EMAIL_MODE: 'rest_edge'
+          EMAIL_MODE: 'fantasy'
         run: python daily_email.py

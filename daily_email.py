@@ -463,11 +463,11 @@ def build_fantasy_section(fantasy):
           <table width="100%" cellpadding="0" cellspacing="0" role="presentation" bgcolor="{CARD}" style="background:{CARD};border:1px solid {BORDER};border-radius:12px;">
             {sections}
           </table>
-          <p style="font-family:{FONT};font-size:12px;color:{MUTED};margin:10px 0 0;">Full picks + goalie table → <a href="https://grindline.ca" style="color:{ACCENT};text-decoration:none;font-weight:700;">grindline.ca</a></p>
+          <p style="font-family:{FONT};font-size:12px;color:{MUTED};margin:10px 0 0;">Full Season Board — goalie table, usage leaders, weekly workload → <a href="https://grindline.ca" style="color:{ACCENT};text-decoration:none;font-weight:700;">grindline.ca</a></p>
         </td></tr>'''
 
 # ── BUILD EMAIL HTML ──────────────────────────────────────────────────────────
-def build_email_html(games_with_signals, odds_data, day_label, yesterday_results=None, yesterday_date="", fantasy=None):
+def build_email_html(games_with_signals, odds_data, day_label, yesterday_results=None, yesterday_date=""):
     """Leads with tonight (Rest Edge headline if it fired, then the full
     slate), then last night's compressed results, then picks. A Rest Edge
     night gets an unmistakable green-accented headline card; a quiet night
@@ -541,9 +541,28 @@ def build_email_html(games_with_signals, odds_data, day_label, yesterday_results
         </td></tr>''' if games_with_signals else ""
 
     results_section = build_results_html(yesterday_results or [], yesterday_date)
-    fantasy_section = build_fantasy_section(fantasy)
 
-    html = f'''<!DOCTYPE html>
+    body_html = f'''
+        <!-- TONIGHT -->
+        <tr><td style="padding:0 20px 10px;">
+          <p style="font-family:{FONT};font-size:11px;font-weight:700;letter-spacing:2px;color:{BRIGHT};text-transform:uppercase;margin:0 0 10px;">Tonight</p>
+          {headline_html}
+        </td></tr>
+
+        <!-- FULL SLATE -->
+        {slate_section}
+
+        <!-- LAST NIGHT\'S RESULTS -->
+        {results_section}'''
+
+    return _email_html_shell("NHL Edge Report", day_label, body_html)
+
+
+def _email_html_shell(title, day_label, body_html):
+    """Shared page chrome (head, header, footer) for both the Rest Edge
+    and fantasy-picks emails - same brand wordmark and footer disclaimer,
+    different title and body content per send."""
+    return f'''<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
@@ -564,24 +583,10 @@ def build_email_html(games_with_signals, odds_data, day_label, yesterday_results
         <!-- HEADER -->
         <tr><td style="padding:4px 20px 20px;">
           <span style="font-family:{FONT};font-size:11px;font-weight:800;letter-spacing:2px;color:{ACCENT};text-transform:uppercase;">Grind Line</span>
-          <div style="font-family:{FONT};font-size:19px;font-weight:800;color:{BRIGHT};margin-top:6px;">NHL Edge Report</div>
+          <div style="font-family:{FONT};font-size:19px;font-weight:800;color:{BRIGHT};margin-top:6px;">{title}</div>
           <div style="font-family:{FONT};font-size:12px;color:{MUTED};margin-top:3px;">{day_label} · <a href="https://grindline.ca" style="color:{MUTED};text-decoration:none;">grindline.ca</a></div>
         </td></tr>
-
-        <!-- TONIGHT -->
-        <tr><td style="padding:0 20px 10px;">
-          <p style="font-family:{FONT};font-size:11px;font-weight:700;letter-spacing:2px;color:{BRIGHT};text-transform:uppercase;margin:0 0 10px;">Tonight</p>
-          {headline_html}
-        </td></tr>
-
-        <!-- FULL SLATE -->
-        {slate_section}
-
-        <!-- LAST NIGHT\'S RESULTS -->
-        {results_section}
-
-        <!-- FANTASY PICKS -->
-        {fantasy_section}
+        {body_html}
 
         <!-- FOOTER -->
         <tr><td style="padding:16px 20px 4px;border-top:1px solid {BORDER};text-align:center;">
@@ -599,9 +604,18 @@ def build_email_html(games_with_signals, odds_data, day_label, yesterday_results
   </table>
 </body>
 </html>'''
-    return html
+
+
+def build_fantasy_email_html(fantasy, day_label):
+    """Standalone fantasy-picks email: goalie starts + props only, same
+    page chrome as the Rest Edge email. fantasy must already be validated
+    non-empty by the caller - this does not itself decide whether to send."""
+    body_html = build_fantasy_section(fantasy)
+    return _email_html_shell("Fantasy Picks", day_label, body_html)
+
+
 # ── BUILD PLAIN TEXT VERSION ──────────────────────────────────────────────────
-def build_email_text(games_with_signals, day_label, yesterday_results=None, yesterday_date="", fantasy=None):
+def build_email_text(games_with_signals, day_label, yesterday_results=None, yesterday_date=""):
     """Mirrors the HTML: tonight leads (Rest Edge headline or a plain
     no-edge line), then the full slate, then a tight one-line-per-game
     results list, then picks."""
@@ -645,25 +659,40 @@ def build_email_text(games_with_signals, day_label, yesterday_results=None, yest
             note = " (Rest Edge)" if r["signal_label"] != "No Signal" else ""
             lines.append(f"  {r['away']} {r['away_score']} @ {r['home']} {r['home_score']} — {result}{note}")
 
-    if fantasy:
-        gs = fantasy.get("goalie_starts", {})
-        goalies = [g for g in gs.get("goalies", []) if g.get("recommendation") == "start"][:2]
-        pp = fantasy.get("player_props", {})
-        props = pp.get("props", [])[:5]
-        if goalies or props:
-            lines.append("")
-            lines.append(f"🏒 TONIGHT'S PICKS — {fantasy.get('date_label','')}:")
-            if goalies:
-                lines.append("  Goalie Starts:")
-                for g in goalies:
-                    lines.append(f"    {g.get('name','')} ({g.get('team','')} vs {g.get('opponent','')}) — {g.get('sv_pct') or '—'} SV%, {g.get('gaa') or '—'} GAA")
-            if props:
-                lines.append("  Top Props:")
-                for p in props:
-                    side = p.get("side", "")
-                    lines.append(f"    {p.get('player','')} — {p.get('market','')} {side.upper()} {p.get('line','')} ({p.get('odds','')} {p.get('book','')})")
-
     lines += ["", "grindline.ca", "Not betting advice — for research purposes only"]
+    return "\n".join(lines)
+
+
+def build_fantasy_email_text(fantasy, day_label):
+    """Standalone fantasy-picks email, plain-text version. fantasy must
+    already be validated non-empty by the caller."""
+    lines = [
+        f"Grind Line — Fantasy Picks — {day_label}",
+        "=" * 50,
+        ""
+    ]
+
+    gs = fantasy.get("goalie_starts", {})
+    goalies = [g for g in gs.get("goalies", []) if g.get("recommendation") == "start"][:2]
+    pp = fantasy.get("player_props", {})
+    props = pp.get("props", [])[:5]
+
+    if goalies:
+        lines.append("GOALIE STARTS:")
+        for g in goalies:
+            lines.append(f"  {g.get('name','')} ({g.get('team','')} vs {g.get('opponent','')}) — {g.get('sv_pct') or '—'} SV%, {g.get('gaa') or '—'} GAA")
+        lines.append("")
+
+    if props:
+        lines.append("TOP PROPS:")
+        for p in props:
+            side = p.get("side", "")
+            line_part = f" {p.get('line','')}" if p.get("line") else ""
+            lines.append(f"  {p.get('player','')} — {p.get('market','')} {side.upper()}{line_part} ({p.get('odds','')} {p.get('book','')})")
+        lines.append("")
+
+    lines.append("Full Season Board — goalie table, usage leaders, weekly workload:")
+    lines += ["  grindline.ca", "", "Not betting advice — for research purposes only"]
     return "\n".join(lines)
 
 # ── FETCH BREVO CONTACTS ──────────────────────────────────────────────────────
@@ -723,11 +752,9 @@ def send_email(to_emails, subject, html_content, text_content):
         return False
 
 # ── MAIN ──────────────────────────────────────────────────────────────────────
-def main():
-    print(f"\n{'='*50}")
-    print(f"Grind Line — Daily Email — {datetime.now(MST).strftime('%Y-%m-%d %H:%M MST')}")
-    print(f"{'='*50}\n")
-
+def send_rest_edge_email():
+    """The 14:00 UTC send: tonight's slate, the Rest Edge headline if it
+    fired, and last night's compressed results. No fantasy content."""
     day_label, today_str = get_today_str()
 
     # 1. Fetch tonight's schedule
@@ -762,9 +789,8 @@ def main():
     # 6. Build email
     print("Building email...")
     subject = f"⚡ NHL Edge Report — {day_label}" if n_signals > 0 else f"NHL Edge Report — {day_label}"
-    fantasy = fetch_fantasy_picks()
-    html_content = build_email_html(games_with_signals, odds_data, day_label, yesterday_results, yesterday_date, fantasy=fantasy)
-    text_content = build_email_text(games_with_signals, day_label, yesterday_results, yesterday_date, fantasy=fantasy)
+    html_content = build_email_html(games_with_signals, odds_data, day_label, yesterday_results, yesterday_date)
+    text_content = build_email_text(games_with_signals, day_label, yesterday_results, yesterday_date)
 
     # 7. Get recipients
     print("Fetching Brevo contacts...")
@@ -778,9 +804,65 @@ def main():
     success = send_email(recipients, subject, html_content, text_content)
 
     if success:
-        print("\n✓ Daily email sent successfully")
+        print("\n✓ Rest Edge email sent successfully")
     else:
         print("\n✗ Email failed — check logs above")
+
+
+def send_fantasy_email():
+    """The 17:30 UTC send: goalie starts, props, link to the Season Board.
+    Runs 30 minutes after the fantasy pipeline writes fantasy.json, so the
+    date guard in fetch_fantasy_picks should pass under normal operation.
+    If it doesn't - stale data, fetch failure, or a valid-but-empty payload
+    (e.g. an off-season placeholder with no goalies/props) - this skips the
+    send entirely rather than mail out an empty shell."""
+    day_label, today_str = get_today_str()
+
+    print("Fetching fantasy picks...")
+    fantasy = fetch_fantasy_picks()
+    if fantasy is None:
+        print("No usable fantasy data (missing, fetch failed, or not today's) — skipping send")
+        return
+
+    gs = fantasy.get("goalie_starts", {})
+    goalies = [g for g in gs.get("goalies", []) if g.get("recommendation") == "start"]
+    props = fantasy.get("player_props", {}).get("props", [])
+    if not goalies and not props:
+        print("Fantasy data has no goalie starts or props today — skipping send")
+        return
+
+    print(f"Building fantasy email ({len(goalies)} goalie start(s), {len(props)} prop(s))...")
+    subject = f"🏒 Grind Line Fantasy Picks — {day_label}"
+    html_content = build_fantasy_email_html(fantasy, day_label)
+    text_content = build_fantasy_email_text(fantasy, day_label)
+
+    print("Fetching Brevo contacts...")
+    recipients = get_brevo_contacts()
+    if not recipients:
+        print("No contacts found — check Brevo list")
+        return
+
+    print(f"Sending to: {recipients}")
+    success = send_email(recipients, subject, html_content, text_content)
+
+    if success:
+        print("\n✓ Fantasy email sent successfully")
+    else:
+        print("\n✗ Email failed — check logs above")
+
+
+def main():
+    mode = os.environ.get("EMAIL_MODE", "rest_edge").strip().lower()
+    print(f"\n{'='*50}")
+    print(f"Grind Line — Daily Email [{mode}] — {datetime.now(MST).strftime('%Y-%m-%d %H:%M MST')}")
+    print(f"{'='*50}\n")
+
+    if mode == "fantasy":
+        send_fantasy_email()
+    elif mode == "rest_edge":
+        send_rest_edge_email()
+    else:
+        print(f"Unknown EMAIL_MODE {mode!r} — expected 'rest_edge' or 'fantasy'")
 
 if __name__ == "__main__":
     main()
