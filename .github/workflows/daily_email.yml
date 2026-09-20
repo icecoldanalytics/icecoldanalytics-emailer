@@ -1,9 +1,9 @@
-name: NHL Daily Edge Email
+name: Daily Email
 on:
-  schedule:
-    # Disabled until Rest Edge rebuild lands
-    # - cron: '0 14 * * *'
-  workflow_dispatch:  # Allows manual trigger from GitHub Actions UI for testing
+  workflow_dispatch:  # Manual trigger for testing
+  # Cron disabled until we've verified a real send:
+  # schedule:
+  #   - cron: '0 14 * * *'
 
 jobs:
   send-daily-email:
