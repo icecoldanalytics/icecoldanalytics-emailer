@@ -15,7 +15,7 @@ import pytz
 BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "YOUR_BREVO_API_KEY_HERE")
 ODDS_API_KEY  = os.environ.get("ODDS_API_KEY", "YOUR_ODDS_API_KEY_HERE")
 FROM_EMAIL    = "hello@grindline.ca"
-FROM_NAME     = "Grind Line""
+FROM_NAME     = "Grind Line"
 
 
 # ── TIMEZONE ──────────────────────────────────────────────────────────────────
@@ -370,12 +370,15 @@ def build_results_html(yesterday_results, yesterday_date):
 
 
 def fetch_fantasy_picks():
-    """Read fantasy picks from the repo, but only if they're today's."""
+    """Fetch today's fantasy picks from the live site, but only if they're
+    today's - this repo has no filesystem access to grindline's data/
+    directory, so this must go over HTTP, not a local file read."""
     try:
-        with open("data/fantasy.json") as f:
-            data = json.load(f)
+        r = requests.get("https://grindline.ca/data/fantasy.json", timeout=10)
+        r.raise_for_status()
+        data = r.json()
     except Exception as e:
-        print(f"Fantasy read error: {e}")
+        print(f"Fantasy fetch error: {e}")
         return None
     today = datetime.now(MST).strftime("%Y-%m-%d")
     if data.get("date") != today:
@@ -384,69 +387,56 @@ def fetch_fantasy_picks():
     return data
 
 
+def fetch_playoff_series():
+    """Fetch playoff series rest data from the live site"""
+    try:
+        r = requests.get("https://icecoldanalytics.ca/data/playoff_series.json", timeout=10)
+        r.raise_for_status()
+        return r.json()
+    except Exception as e:
+        print(f"Playoff series fetch error: {e}")
+        return None
+
+
 def build_fantasy_section(fantasy):
-    """Build a condensed fantasy picks section for email"""
+    """Build a condensed goalie-starts + props section for email. There is
+    no value_plays anymore - update_fantasy.py's output dict only carries
+    goalie_starts and player_props (market/line/side/odds/book/confidence),
+    not the old tier/dk_salary/prop_type/pick schema this used to read."""
     if not fantasy:
         return ""
 
-    vp = fantasy.get("value_plays", {})
-    plays = vp.get("plays", [])[:5]
     pp = fantasy.get("player_props", {})
-    props = pp.get("props", [])[:4]
+    props = pp.get("props", [])[:5]
     gs = fantasy.get("goalie_starts", {})
     goalies = [g for g in gs.get("goalies", []) if g.get("recommendation") == "start"][:2]
 
-    if not plays:
+    if not props and not goalies:
         return ""
-
-    plays_html = ""
-    for p in plays:
-        tier_color = "#ffb020" if p["tier"] == "S" else "#00c2ff" if p["tier"] == "A" else "#00ff88"
-        tags_html = " ".join(f'<span style="background:#1e2d38;color:#adc8d8;font-family:Arial,sans-serif;font-size:10px;padding:3px 7px;border-radius:3px;margin-right:3px;">{t}</span>' for t in p.get("tags", []))
-        plays_html += f'''
-        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;border:1px solid #2a3d4a;border-radius:6px;background:#111d27;">
-          <tr>
-            <td style="padding:12px 14px 4px;">
-              <span style="background:{tier_color};color:#000;font-family:Arial,sans-serif;font-size:10px;font-weight:bold;padding:3px 7px;border-radius:3px;margin-right:8px;">{p["tier"]}-TIER</span>
-              <span style="font-family:Arial,sans-serif;font-size:15px;font-weight:bold;color:#ffffff;">{p["player"]}</span>
-            </td>
-            <td style="padding:12px 14px 4px;text-align:right;white-space:nowrap;">
-              <span style="font-family:Arial,sans-serif;font-size:12px;color:#adc8d8;">DK {p["dk_salary"]}</span>
-            </td>
-          </tr>
-          <tr>
-            <td colspan="2" style="padding:2px 14px 6px;">
-              <span style="font-family:Arial,sans-serif;font-size:12px;color:#adc8d8;">{p["team"]} · {p["position"]} · {p["matchup"]} · {p["game_time"]}</span>
-            </td>
-          </tr>
-          <tr>
-            <td colspan="2" style="padding:2px 14px 8px;">
-              <span style="font-family:Arial,sans-serif;font-size:12px;color:#c8dce8;">{p["reason"][:140]}{"..." if len(p["reason"]) > 140 else ""}</span>
-            </td>
-          </tr>
-          <tr>
-            <td colspan="2" style="padding:0 14px 10px;">{tags_html}</td>
-          </tr>
-        </table>'''
 
     props_html = ""
     for p in props:
-        pick_color = "#00ff88" if p["pick"] == "over" else "#ff4444" if p["pick"] == "under" else "#00c2ff"
-        pick_bg = "rgba(0,255,136,0.15)" if p["pick"] == "over" else "rgba(255,68,68,0.15)" if p["pick"] == "under" else "rgba(0,194,255,0.15)"
+        side = p.get("side", "")
+        side_color = "#00ff88" if side.lower() == "over" else "#ff4444" if side.lower() == "under" else "#00c2ff"
+        side_bg = "rgba(0,255,136,0.15)" if side.lower() == "over" else "rgba(255,68,68,0.15)" if side.lower() == "under" else "rgba(0,194,255,0.15)"
+        reason = p.get("reason", "")
         props_html += f'''
         <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;border:1px solid #2a3d4a;border-radius:6px;background:#111d27;">
           <tr>
             <td style="padding:12px 14px 4px;">
-              <span style="font-family:Arial,sans-serif;font-size:15px;font-weight:bold;color:#ffffff;">{p["player"]}</span>
-              <span style="font-family:Arial,sans-serif;font-size:12px;color:#adc8d8;margin-left:6px;">— {p["prop_type"]}</span>
+              <span style="font-family:Arial,sans-serif;font-size:15px;font-weight:bold;color:#ffffff;">{p.get("player","")}</span>
+              <span style="font-family:Arial,sans-serif;font-size:12px;color:#adc8d8;margin-left:6px;">— {p.get("market","")}</span>
             </td>
             <td style="padding:12px 14px 4px;text-align:right;white-space:nowrap;">
-              <span style="background:{pick_bg};color:{pick_color};font-family:Arial,sans-serif;font-size:12px;font-weight:bold;padding:4px 8px;border-radius:4px;">{p["pick"].upper()} {p["line"]}</span>
-              <span style="font-family:Arial,sans-serif;font-size:12px;color:#adc8d8;margin-left:6px;">{p["odds"]}</span>
+              <span style="background:{side_bg};color:{side_color};font-family:Arial,sans-serif;font-size:12px;font-weight:bold;padding:4px 8px;border-radius:4px;">{side.upper()} {p.get("line","")}</span>
+              <span style="font-family:Arial,sans-serif;font-size:12px;color:#adc8d8;margin-left:6px;">{p.get("odds","")}</span>
             </td>
           </tr>
           <tr>
-            <td colspan="2" style="padding:2px 14px 10px;font-family:Arial,sans-serif;font-size:12px;color:#c8dce8;">{p["reason"][:140]}{"..." if len(p["reason"]) > 140 else ""}</td>
+            <td colspan="2" style="padding:2px 14px 4px;font-family:Arial,sans-serif;font-size:11px;color:#8fafc4;">{p.get("game","")} · {p.get("book","")} · {p.get("confidence","")} confidence</td>
+          </tr>
+          <tr>
+            <td colspan="2" style="padding:2px 14px 10px;font-family:Arial,sans-serif;font-size:12px;color:#c8dce8;">{reason[:140]}{"..." if len(reason) > 140 else ""}</td>
           </tr>
         </table>'''
 
@@ -456,31 +446,90 @@ def build_fantasy_section(fantasy):
         <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;border:1px solid #2a3d4a;border-radius:6px;background:#111d27;">
           <tr>
             <td style="padding:12px 14px 4px;">
-              <span style="background:#00ff88;color:#000;font-family:Arial,sans-serif;font-size:10px;font-weight:bold;padding:3px 7px;border-radius:3px;margin-right:8px;">▲ START</span>
-              <span style="font-family:Arial,sans-serif;font-size:15px;font-weight:bold;color:#ffffff;">{g["name"]}</span>
+              <span style="background:#00ff88;color:#000;font-family:Arial,sans-serif;font-size:10px;font-weight:bold;padding:3px 7px;border-radius:3px;margin-right:8px;">▲ {g.get("rec_label","Start").upper()}</span>
+              <span style="font-family:Arial,sans-serif;font-size:15px;font-weight:bold;color:#ffffff;">{g.get("name","")}</span>
             </td>
             <td style="padding:12px 14px 4px;text-align:right;white-space:nowrap;">
-              <span style="font-family:Arial,sans-serif;font-size:12px;color:#adc8d8;">{g["sv_pct"]} SV%</span>
+              <span style="font-family:Arial,sans-serif;font-size:12px;color:#adc8d8;">{g.get("sv_pct") or "—"} SV%</span>
             </td>
           </tr>
           <tr>
-            <td colspan="2" style="padding:2px 14px 10px;font-family:Arial,sans-serif;font-size:12px;color:#adc8d8;">{g["team"]} vs {g["opponent"]} · {g["gaa"]} GAA{(" · " + g["signal_note"]) if g.get("signal_note") else ""}</td>
+            <td colspan="2" style="padding:2px 14px 10px;font-family:Arial,sans-serif;font-size:12px;color:#adc8d8;">{g.get("team","")} vs {g.get("opponent","")} · {g.get("gaa") or "—"} GAA{(" · " + g["rest_note"]) if g.get("rest_note") else ""}</td>
           </tr>
         </table>'''
 
     return f'''
         <!-- FANTASY PICKS -->
         <tr><td style="background:#0d1a24;border-left:1px solid #1e2d38;border-right:1px solid #1e2d38;padding:16px 20px 8px;">
-          <p style="font-family:Arial,sans-serif;font-size:11px;font-weight:bold;letter-spacing:2px;color:#00c2ff;text-transform:uppercase;margin:0 0 12px;">🏒 Top Fantasy Plays · {fantasy.get("date_label","")}</p>
-          {plays_html}
-          <p style="font-family:Arial,sans-serif;font-size:11px;font-weight:bold;letter-spacing:2px;color:#8fafc4;text-transform:uppercase;margin:16px 0 10px;">📊 Top Props</p>
-          {props_html}
-          {"<p style='font-family:Arial,sans-serif;font-size:11px;font-weight:bold;letter-spacing:2px;color:#8fafc4;text-transform:uppercase;margin:16px 0 10px;'>🥅 Goalie Starts</p>" + goalies_html if goalies_html else ""}
+          <p style="font-family:Arial,sans-serif;font-size:11px;font-weight:bold;letter-spacing:2px;color:#00c2ff;text-transform:uppercase;margin:0 0 12px;">🏒 Tonight's Picks · {fantasy.get("date_label","")}</p>
+          {"<p style='font-family:Arial,sans-serif;font-size:11px;font-weight:bold;letter-spacing:2px;color:#8fafc4;text-transform:uppercase;margin:0 0 10px;'>🥅 Goalie Starts</p>" + goalies_html if goalies_html else ""}
+          {"<p style='font-family:Arial,sans-serif;font-size:11px;font-weight:bold;letter-spacing:2px;color:#8fafc4;text-transform:uppercase;margin:16px 0 10px;'>📊 Top Props</p>" + props_html if props_html else ""}
           <p style="font-family:Arial,sans-serif;font-size:12px;color:#8fafc4;margin:10px 0 0;">Full picks + goalie table → <a href="https://grindline.ca" style="color:#00c2ff;text-decoration:none;font-weight:bold;">grindline.ca</a></p>
         </td></tr>'''
 
+def build_playoff_section(playoff_data):
+    """Build a playoff rest differential section for the email"""
+    if not playoff_data:
+        return ""
+    active = [s for s in playoff_data.get("series", []) if s["status"] == "active"]
+    if not active:
+        return ""
+
+    rows = ""
+    for s in active:
+        rest_diff = s.get("rest_diff")
+        away_rest = s.get("away_rest_days")
+        home_rest = s.get("home_rest_days")
+        signal = s.get("rest_signal", "none")
+
+        if signal == "home_advantage":
+            border_color = "#ff4444"
+            signal_badge = f'<span style="background:#ff4444;color:#fff;font-family:Arial,sans-serif;font-size:10px;font-weight:bold;padding:3px 7px;border-radius:3px;margin-left:8px;">REST EDGE: {s["home"]}</span>'
+        elif signal == "away_advantage":
+            border_color = "#ffb020"
+            signal_badge = f'<span style="background:#ffb020;color:#000;font-family:Arial,sans-serif;font-size:10px;font-weight:bold;padding:3px 7px;border-radius:3px;margin-left:8px;">REST EDGE: {s["away"]}</span>'
+        else:
+            border_color = "#2a3d4a"
+            signal_badge = ""
+
+        away_rest_str = f"{away_rest}d" if away_rest is not None else "—"
+        home_rest_str = f"{home_rest}d" if home_rest is not None else "—"
+        diff_str = (f"+{rest_diff}d home" if rest_diff and rest_diff > 0
+                    else f"{abs(rest_diff)}d away" if rest_diff and rest_diff < 0
+                    else "even") if rest_diff is not None else "—"
+
+        rows += f'''
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;border:1px solid {border_color};border-radius:6px;background:#111d27;">
+          <tr>
+            <td style="padding:12px 14px 4px;">
+              <span style="font-family:Arial,sans-serif;font-size:14px;font-weight:bold;color:#ffffff;">{s["away"]} @ {s["home"]}</span>
+              {signal_badge}
+            </td>
+            <td style="padding:12px 14px 4px;text-align:right;white-space:nowrap;">
+              <span style="font-family:Arial,sans-serif;font-size:12px;color:#adc8d8;">{s["round_label"]}</span>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="2" style="padding:2px 14px 10px;font-family:Arial,sans-serif;font-size:12px;color:#8fafc4;">
+              Series: {s["series_score"]} &nbsp;·&nbsp;
+              {s["away"]} rest: {away_rest_str} &nbsp;·&nbsp;
+              {s["home"]} rest: {home_rest_str} &nbsp;·&nbsp;
+              Diff: {diff_str}
+            </td>
+          </tr>
+        </table>'''
+
+    season = playoff_data.get("season", "")
+    return f'''
+        <!-- PLAYOFF REST DIFFERENTIALS -->
+        <tr><td style="background:#0d1a24;border-left:1px solid #1e2d38;border-right:1px solid #1e2d38;padding:16px 20px 8px;">
+          <p style="font-family:Arial,sans-serif;font-size:11px;font-weight:bold;letter-spacing:2px;color:#00c2ff;text-transform:uppercase;margin:0 0 12px;">🏆 Playoff Rest Differentials — {season}</p>
+          {rows}
+        </td></tr>'''
+
+
 # ── BUILD EMAIL HTML ──────────────────────────────────────────────────────────
-def build_email_html(games_with_signals, odds_data, day_label, yesterday_results=None, yesterday_date="", fantasy=None):
+def build_email_html(games_with_signals, odds_data, day_label, yesterday_results=None, yesterday_date="", fantasy=None, playoff_data=None):
     signal_games = [g for g in games_with_signals if g["signal"] in ("HIGH", "MID")]
     regular_games = [g for g in games_with_signals if g["signal"] not in ("HIGH", "MID")]
 
@@ -540,6 +589,7 @@ def build_email_html(games_with_signals, odds_data, day_label, yesterday_results
 
     results_section = build_results_html(yesterday_results or [], yesterday_date)
     fantasy_section = build_fantasy_section(fantasy)
+    playoff_section = build_playoff_section(playoff_data)
 
     html = f'''<!DOCTYPE html>
 <html>
@@ -576,6 +626,9 @@ def build_email_html(games_with_signals, odds_data, day_label, yesterday_results
         <!-- LAST NIGHT\'S RESULTS -->
         {results_section}
 
+        <!-- PLAYOFF REST DIFFERENTIALS -->
+        {playoff_section}
+
         <!-- SIGNAL GAMES -->
         {'<tr><td style="background:#0d1a24;border-left:1px solid #1e2d38;border-right:1px solid #1e2d38;padding:16px 24px 8px;"><p style="font-family:monospace;font-size:9px;letter-spacing:2px;color:#ff4444;text-transform:uppercase;margin:0 0 10px;">⚡ Flagged Games</p>' + signal_games_html + '</td></tr>' if signal_games else ''}
 
@@ -603,7 +656,7 @@ def build_email_html(games_with_signals, odds_data, day_label, yesterday_results
 </html>'''
     return html
 # ── BUILD PLAIN TEXT VERSION ──────────────────────────────────────────────────
-def build_email_text(games_with_signals, day_label, yesterday_results=None, yesterday_date=""):
+def build_email_text(games_with_signals, day_label, yesterday_results=None, yesterday_date="", fantasy=None):
     lines = [
         f"Grind Line — NHL Edge Report — {day_label}",
         "=" * 50,
@@ -634,6 +687,24 @@ def build_email_text(games_with_signals, day_label, yesterday_results=None, yest
     for g in games_with_signals:
         b2b = " [B2B]" if g["away_b2b"] or g["home_b2b"] else ""
         lines.append(f"  {g['away']} @ {g['home']} — {g['time_str']}{b2b}")
+
+    if fantasy:
+        gs = fantasy.get("goalie_starts", {})
+        goalies = [g for g in gs.get("goalies", []) if g.get("recommendation") == "start"][:2]
+        pp = fantasy.get("player_props", {})
+        props = pp.get("props", [])[:5]
+        if goalies or props:
+            lines.append("")
+            lines.append(f"🏒 TONIGHT'S PICKS — {fantasy.get('date_label','')}:")
+            if goalies:
+                lines.append("  Goalie Starts:")
+                for g in goalies:
+                    lines.append(f"    {g.get('name','')} ({g.get('team','')} vs {g.get('opponent','')}) — {g.get('sv_pct') or '—'} SV%, {g.get('gaa') or '—'} GAA")
+            if props:
+                lines.append("  Top Props:")
+                for p in props:
+                    side = p.get("side", "")
+                    lines.append(f"    {p.get('player','')} — {p.get('market','')} {side.upper()} {p.get('line','')} ({p.get('odds','')} {p.get('book','')})")
 
     lines += ["", "grindline.ca", "Not betting advice — for research purposes only"]
     return "\n".join(lines)
@@ -722,8 +793,9 @@ def main():
     print("Building email...")
     subject = f"⚡ NHL Edge Report — {day_label}" if n_signals > 0 else f"NHL Edge Report — {day_label}"
     fantasy = fetch_fantasy_picks()
-    html_content = build_email_html(games_with_signals, odds_data, day_label, yesterday_results, yesterday_date, fantasy=fantasy)
-    text_content = build_email_text(games_with_signals, day_label, yesterday_results, yesterday_date)
+    playoff_data = fetch_playoff_series()
+    html_content = build_email_html(games_with_signals, odds_data, day_label, yesterday_results, yesterday_date, fantasy=fantasy, playoff_data=playoff_data)
+    text_content = build_email_text(games_with_signals, day_label, yesterday_results, yesterday_date, fantasy=fantasy)
 
     # 7. Get recipients
     print("Fetching Brevo contacts...")
