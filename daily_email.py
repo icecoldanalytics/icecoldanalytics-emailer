@@ -374,17 +374,6 @@ def fetch_fantasy_picks():
     return data
 
 
-def fetch_playoff_series():
-    """Fetch playoff series rest data from the live site"""
-    try:
-        r = requests.get("https://icecoldanalytics.ca/data/playoff_series.json", timeout=10)
-        r.raise_for_status()
-        return r.json()
-    except Exception as e:
-        print(f"Playoff series fetch error: {e}")
-        return None
-
-
 def build_fantasy_section(fantasy):
     """Build a condensed goalie-starts + props section for email. There is
     no value_plays anymore - update_fantasy.py's output dict only carries
@@ -454,69 +443,8 @@ def build_fantasy_section(fantasy):
           <p style="font-family:Arial,sans-serif;font-size:12px;color:#8fafc4;margin:10px 0 0;">Full picks + goalie table → <a href="https://grindline.ca" style="color:#00c2ff;text-decoration:none;font-weight:bold;">grindline.ca</a></p>
         </td></tr>'''
 
-def build_playoff_section(playoff_data):
-    """Build a playoff rest differential section for the email"""
-    if not playoff_data:
-        return ""
-    active = [s for s in playoff_data.get("series", []) if s["status"] == "active"]
-    if not active:
-        return ""
-
-    rows = ""
-    for s in active:
-        rest_diff = s.get("rest_diff")
-        away_rest = s.get("away_rest_days")
-        home_rest = s.get("home_rest_days")
-        signal = s.get("rest_signal", "none")
-
-        if signal == "home_advantage":
-            border_color = "#ff4444"
-            signal_badge = f'<span style="background:#ff4444;color:#fff;font-family:Arial,sans-serif;font-size:10px;font-weight:bold;padding:3px 7px;border-radius:3px;margin-left:8px;">REST EDGE: {s["home"]}</span>'
-        elif signal == "away_advantage":
-            border_color = "#ffb020"
-            signal_badge = f'<span style="background:#ffb020;color:#000;font-family:Arial,sans-serif;font-size:10px;font-weight:bold;padding:3px 7px;border-radius:3px;margin-left:8px;">REST EDGE: {s["away"]}</span>'
-        else:
-            border_color = "#2a3d4a"
-            signal_badge = ""
-
-        away_rest_str = f"{away_rest}d" if away_rest is not None else "—"
-        home_rest_str = f"{home_rest}d" if home_rest is not None else "—"
-        diff_str = (f"+{rest_diff}d home" if rest_diff and rest_diff > 0
-                    else f"{abs(rest_diff)}d away" if rest_diff and rest_diff < 0
-                    else "even") if rest_diff is not None else "—"
-
-        rows += f'''
-        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;border:1px solid {border_color};border-radius:6px;background:#111d27;">
-          <tr>
-            <td style="padding:12px 14px 4px;">
-              <span style="font-family:Arial,sans-serif;font-size:14px;font-weight:bold;color:#ffffff;">{s["away"]} @ {s["home"]}</span>
-              {signal_badge}
-            </td>
-            <td style="padding:12px 14px 4px;text-align:right;white-space:nowrap;">
-              <span style="font-family:Arial,sans-serif;font-size:12px;color:#adc8d8;">{s["round_label"]}</span>
-            </td>
-          </tr>
-          <tr>
-            <td colspan="2" style="padding:2px 14px 10px;font-family:Arial,sans-serif;font-size:12px;color:#8fafc4;">
-              Series: {s["series_score"]} &nbsp;·&nbsp;
-              {s["away"]} rest: {away_rest_str} &nbsp;·&nbsp;
-              {s["home"]} rest: {home_rest_str} &nbsp;·&nbsp;
-              Diff: {diff_str}
-            </td>
-          </tr>
-        </table>'''
-
-    season = playoff_data.get("season", "")
-    return f'''
-        <!-- PLAYOFF REST DIFFERENTIALS -->
-        <tr><td style="background:#0d1a24;border-left:1px solid #1e2d38;border-right:1px solid #1e2d38;padding:16px 20px 8px;">
-          <p style="font-family:Arial,sans-serif;font-size:11px;font-weight:bold;letter-spacing:2px;color:#00c2ff;text-transform:uppercase;margin:0 0 12px;">🏆 Playoff Rest Differentials — {season}</p>
-          {rows}
-        </td></tr>'''
-
-
 # ── BUILD EMAIL HTML ──────────────────────────────────────────────────────────
-def build_email_html(games_with_signals, odds_data, day_label, yesterday_results=None, yesterday_date="", fantasy=None, playoff_data=None):
+def build_email_html(games_with_signals, odds_data, day_label, yesterday_results=None, yesterday_date="", fantasy=None):
     signal_games = [g for g in games_with_signals if g["signal"] == "HIGH"]
     regular_games = [g for g in games_with_signals if g["signal"] != "HIGH"]
 
@@ -576,7 +504,6 @@ def build_email_html(games_with_signals, odds_data, day_label, yesterday_results
 
     results_section = build_results_html(yesterday_results or [], yesterday_date)
     fantasy_section = build_fantasy_section(fantasy)
-    playoff_section = build_playoff_section(playoff_data)
 
     html = f'''<!DOCTYPE html>
 <html>
@@ -612,9 +539,6 @@ def build_email_html(games_with_signals, odds_data, day_label, yesterday_results
 
         <!-- LAST NIGHT\'S RESULTS -->
         {results_section}
-
-        <!-- PLAYOFF REST DIFFERENTIALS -->
-        {playoff_section}
 
         <!-- SIGNAL GAMES -->
         {'<tr><td style="background:#0d1a24;border-left:1px solid #1e2d38;border-right:1px solid #1e2d38;padding:16px 24px 8px;"><p style="font-family:monospace;font-size:9px;letter-spacing:2px;color:#ff4444;text-transform:uppercase;margin:0 0 10px;">⚡ Flagged Games</p>' + signal_games_html + '</td></tr>' if signal_games else ''}
@@ -780,8 +704,7 @@ def main():
     print("Building email...")
     subject = f"⚡ NHL Edge Report — {day_label}" if n_signals > 0 else f"NHL Edge Report — {day_label}"
     fantasy = fetch_fantasy_picks()
-    playoff_data = fetch_playoff_series()
-    html_content = build_email_html(games_with_signals, odds_data, day_label, yesterday_results, yesterday_date, fantasy=fantasy, playoff_data=playoff_data)
+    html_content = build_email_html(games_with_signals, odds_data, day_label, yesterday_results, yesterday_date, fantasy=fantasy)
     text_content = build_email_text(games_with_signals, day_label, yesterday_results, yesterday_date, fantasy=fantasy)
 
     # 7. Get recipients
