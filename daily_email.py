@@ -19,6 +19,26 @@ ODDS_API_KEY  = os.environ.get("ODDS_API_KEY", "YOUR_ODDS_API_KEY_HERE")
 FROM_EMAIL    = "hello@grindline.ca"
 FROM_NAME     = "Grind Line"
 
+# ── EMAIL DESIGN TOKENS ─────────────────────────────────────────────────────
+# Pulled directly from grindline.ca's :root palette (index.html) so the email
+# matches the site rather than approximating it. No CSS variables, gradients,
+# flex/grid or webfonts here - Outlook's Word rendering engine supports none
+# of that, so every value is inlined and layout stays table-based. Rounded
+# corners and rgba tints are used where Outlook safely ignores/degrades them
+# (square corners, or the solid text/border color still reads fine without
+# the tint) - nothing depends on them rendering.
+BG      = "#060b14"   # page background            (site --dark)
+CARD    = "#0d1a2a"   # card/section background     (site --card)
+BORDER  = "#162334"   # card/row borders            (site --border)
+ACCENT  = "#00c46a"   # brand green / CTAs          (site --accent)
+GREEN   = "#3ddc97"   # win / Rest Edge fired        (site --green)
+RED     = "#ff4757"   # loss                        (site --red)
+GOLD    = "#f5a623"   # confidence / secondary badge (site --gold)
+TEXT    = "#c5e8d5"   # body copy                   (site --text)
+MUTED   = "#5a8a72"   # secondary/meta text         (site --muted)
+BRIGHT  = "#ffffff"   # headings                    (site --bright)
+FONT    = "'Segoe UI',system-ui,Arial,sans-serif"
+
 
 # ── TIMEZONE ──────────────────────────────────────────────────────────────────
 MST = pytz.timezone("America/Edmonton")
@@ -314,45 +334,45 @@ def detect_signals(games, b2b_teams, played_yesterday, played_two_days_ago):
 
 # ── BUILD RESULTS SECTION HTML ────────────────────────────────────────────────
 def build_results_html(yesterday_results, yesterday_date):
+    """A tight, one-line-per-game list - mirrors the site's recap-row/
+    rr-result treatment (bordered card, thin row dividers, small right-
+    aligned outcome badge) rather than a large card per game. This is what
+    a no-Rest-Edge night leans on to still read as a full email."""
     if not yesterday_results:
         return ""
 
     date_label = datetime.strptime(yesterday_date, "%Y-%m-%d").strftime("%a %b %-d") if yesterday_date else "Yesterday"
 
     rows = ""
-    for r in yesterday_results:
-        icon = "✅" if r["fade_won"] is True else "❌" if r["fade_won"] is False else "·"
-        result_color = "#00ff88" if r["fade_won"] is True else "#ff4444" if r["fade_won"] is False else "#8fafc4"
-        result_word = "WIN" if r["fade_won"] is True else "LOSS" if r["fade_won"] is False else "NO SIGNAL"
-        border_color = "#00ff88" if r["fade_won"] is True else "#ff4444" if r["fade_won"] is False else "#2a3d4a"
-
-        if r["signal_label"] != "No Signal":
-            fade_note = f"{r['signal_label']} · Fade {r['away']}{'  (B2B)' if r['away_b2b'] else ''} · Home rested {r['home_rest']}d"
+    for i, r in enumerate(yesterday_results):
+        won = r["fade_won"]
+        if won is True:
+            badge_bg, badge_color, badge_border, badge_text = "rgba(61,220,151,0.12)", GREEN, "rgba(61,220,151,0.4)", "WIN"
+        elif won is False:
+            badge_bg, badge_color, badge_border, badge_text = "rgba(255,71,87,0.12)", RED, "rgba(255,71,87,0.35)", "LOSS"
         else:
-            fade_note = "No signal"
+            badge_bg, badge_color, badge_border, badge_text = "rgba(90,138,114,0.08)", MUTED, "rgba(90,138,114,0.25)", "NO SIGNAL"
+
+        note = f'<div style="font-family:{FONT};font-size:11px;color:{MUTED};margin-top:3px;">Rest Edge · backed {r["home"]}</div>' if r["signal_label"] != "No Signal" else ""
+        border_bottom = f"border-bottom:1px solid {BORDER};" if i < len(yesterday_results) - 1 else ""
 
         rows += f'''
-        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;border:1px solid {border_color};border-radius:6px;background:#111d27;">
-          <tr>
-            <td style="padding:12px 14px 4px;">
-              <span style="font-family:Arial,sans-serif;font-size:16px;font-weight:bold;color:#ffffff;">{r["away"]} @ {r["home"]}</span>
-              <span style="font-family:Arial,sans-serif;font-size:13px;color:#adc8d8;margin-left:8px;">{r["score_str"]}</span>
+        <tr><td style="padding:11px 20px;{border_bottom}">
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
+            <td style="font-family:{FONT};font-size:13px;font-weight:700;color:{BRIGHT};">{r["away"]} {r["away_score"]} @ {r["home"]} {r["home_score"]}</td>
+            <td align="right" style="white-space:nowrap;padding-left:10px;">
+              <span style="display:inline-block;background:{badge_bg};color:{badge_color};border:1px solid {badge_border};font-family:{FONT};font-size:10px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;padding:3px 9px;border-radius:4px;">{badge_text}</span>
             </td>
-            <td style="padding:12px 14px 4px;text-align:right;white-space:nowrap;">
-              <span style="font-family:Arial,sans-serif;font-size:13px;font-weight:bold;color:{result_color};">{icon} {result_word}</span>
-            </td>
-          </tr>
-          <tr>
-            <td colspan="2" style="padding:2px 14px 12px;font-family:Arial,sans-serif;font-size:12px;color:#8fafc4;">
-              {fade_note}
-            </td>
-          </tr>
-        </table>'''
+          </tr></table>
+          {note}
+        </td></tr>'''
 
     return f'''
-    <tr><td style="background:#0d1a24;border-left:1px solid #1e2d38;border-right:1px solid #1e2d38;padding:16px 20px 8px;">
-      <p style="font-family:Arial,sans-serif;font-size:11px;font-weight:bold;letter-spacing:2px;color:#00c2ff;text-transform:uppercase;margin:0 0 12px;">📊 Last Night's Results — {date_label}</p>
-      {rows}
+    <tr><td style="padding:0 20px 16px;">
+      <p style="font-family:{FONT};font-size:11px;font-weight:700;letter-spacing:2px;color:{BRIGHT};text-transform:uppercase;margin:0 0 10px;">Last Night — {date_label}</p>
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" bgcolor="{CARD}" style="background:{CARD};border:1px solid {BORDER};border-radius:12px;">
+        {rows}
+      </table>
     </td></tr>'''
 
 
@@ -391,116 +411,134 @@ def build_fantasy_section(fantasy):
         return ""
 
     props_html = ""
-    for p in props:
+    for i, p in enumerate(props):
         side = p.get("side", "")
-        side_color = "#00ff88" if side.lower() == "over" else "#ff4444" if side.lower() == "under" else "#00c2ff"
-        side_bg = "rgba(0,255,136,0.15)" if side.lower() == "over" else "rgba(255,68,68,0.15)" if side.lower() == "under" else "rgba(0,194,255,0.15)"
+        side_color = GREEN if side.lower() == "over" else RED if side.lower() == "under" else ACCENT
+        side_bg = "rgba(61,220,151,0.12)" if side.lower() == "over" else "rgba(255,71,87,0.12)" if side.lower() == "under" else "rgba(0,196,106,0.12)"
+        side_border = "rgba(61,220,151,0.35)" if side.lower() == "over" else "rgba(255,71,87,0.3)" if side.lower() == "under" else "rgba(0,196,106,0.3)"
         reason = p.get("reason", "")
+        border_bottom = f"border-bottom:1px solid {BORDER};" if i < len(props) - 1 else ""
         props_html += f'''
-        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;border:1px solid #2a3d4a;border-radius:6px;background:#111d27;">
-          <tr>
-            <td style="padding:12px 14px 4px;">
-              <span style="font-family:Arial,sans-serif;font-size:15px;font-weight:bold;color:#ffffff;">{p.get("player","")}</span>
-              <span style="font-family:Arial,sans-serif;font-size:12px;color:#adc8d8;margin-left:6px;">— {p.get("market","")}</span>
+        <tr><td style="padding:11px 20px;{border_bottom}">
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
+            <td style="font-family:{FONT};font-size:13px;font-weight:700;color:{BRIGHT};">{p.get("player","")} <span style="font-weight:400;color:{MUTED};">— {p.get("market","")}</span></td>
+            <td align="right" style="white-space:nowrap;padding-left:10px;">
+              <span style="display:inline-block;background:{side_bg};color:{side_color};border:1px solid {side_border};font-family:{FONT};font-size:10px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;padding:3px 9px;border-radius:4px;">{side.upper()} {p.get("line","")}</span>
+              <span style="font-family:{FONT};font-size:11px;color:{MUTED};margin-left:6px;">{p.get("odds","")}</span>
             </td>
-            <td style="padding:12px 14px 4px;text-align:right;white-space:nowrap;">
-              <span style="background:{side_bg};color:{side_color};font-family:Arial,sans-serif;font-size:12px;font-weight:bold;padding:4px 8px;border-radius:4px;">{side.upper()} {p.get("line","")}</span>
-              <span style="font-family:Arial,sans-serif;font-size:12px;color:#adc8d8;margin-left:6px;">{p.get("odds","")}</span>
-            </td>
-          </tr>
-          <tr>
-            <td colspan="2" style="padding:2px 14px 4px;font-family:Arial,sans-serif;font-size:11px;color:#8fafc4;">{p.get("game","")} · {p.get("book","")} · {p.get("confidence","")} confidence</td>
-          </tr>
-          <tr>
-            <td colspan="2" style="padding:2px 14px 10px;font-family:Arial,sans-serif;font-size:12px;color:#c8dce8;">{reason[:140]}{"..." if len(reason) > 140 else ""}</td>
-          </tr>
-        </table>'''
+          </tr></table>
+          <div style="font-family:{FONT};font-size:11px;color:{MUTED};margin-top:3px;">{p.get("game","")} · {p.get("book","")} · {p.get("confidence","")} confidence</div>
+          <div style="font-family:{FONT};font-size:12px;color:{TEXT};margin-top:4px;">{reason[:140]}{"..." if len(reason) > 140 else ""}</div>
+        </td></tr>'''
 
     goalies_html = ""
-    for g in goalies:
+    for i, g in enumerate(goalies):
+        border_bottom = f"border-bottom:1px solid {BORDER};" if i < len(goalies) - 1 else ""
         goalies_html += f'''
-        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;border:1px solid #2a3d4a;border-radius:6px;background:#111d27;">
-          <tr>
-            <td style="padding:12px 14px 4px;">
-              <span style="background:#00ff88;color:#000;font-family:Arial,sans-serif;font-size:10px;font-weight:bold;padding:3px 7px;border-radius:3px;margin-right:8px;">▲ {g.get("rec_label","Start").upper()}</span>
-              <span style="font-family:Arial,sans-serif;font-size:15px;font-weight:bold;color:#ffffff;">{g.get("name","")}</span>
+        <tr><td style="padding:11px 20px;{border_bottom}">
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
+            <td style="font-family:{FONT};font-size:13px;font-weight:700;color:{BRIGHT};">
+              <span style="display:inline-block;background:rgba(61,220,151,0.12);color:{GREEN};border:1px solid rgba(61,220,151,0.35);font-family:{FONT};font-size:10px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;padding:3px 8px;border-radius:4px;margin-right:8px;">{g.get("rec_label","Start")}</span>
+              {g.get("name","")}
             </td>
-            <td style="padding:12px 14px 4px;text-align:right;white-space:nowrap;">
-              <span style="font-family:Arial,sans-serif;font-size:12px;color:#adc8d8;">{g.get("sv_pct") or "—"} SV%</span>
-            </td>
-          </tr>
-          <tr>
-            <td colspan="2" style="padding:2px 14px 10px;font-family:Arial,sans-serif;font-size:12px;color:#adc8d8;">{g.get("team","")} vs {g.get("opponent","")} · {g.get("gaa") or "—"} GAA{(" · " + g["rest_note"]) if g.get("rest_note") else ""}</td>
-          </tr>
-        </table>'''
+            <td align="right" style="white-space:nowrap;padding-left:10px;font-family:{FONT};font-size:12px;color:{MUTED};">{g.get("sv_pct") or "—"} SV%</td>
+          </tr></table>
+          <div style="font-family:{FONT};font-size:11px;color:{MUTED};margin-top:3px;">{g.get("team","")} vs {g.get("opponent","")} · {g.get("gaa") or "—"} GAA{(" · " + g["rest_note"]) if g.get("rest_note") else ""}</div>
+        </td></tr>'''
+
+    sections = ""
+    if goalies_html:
+        sections += f'''
+        <tr><td style="padding:14px 20px 4px;font-family:{FONT};font-size:10px;font-weight:700;letter-spacing:1.5px;color:{MUTED};text-transform:uppercase;">Goalie Starts</td></tr>
+        {goalies_html}'''
+    if props_html:
+        sections += f'''
+        <tr><td style="padding:14px 20px 4px;font-family:{FONT};font-size:10px;font-weight:700;letter-spacing:1.5px;color:{MUTED};text-transform:uppercase;">Top Props</td></tr>
+        {props_html}'''
 
     return f'''
         <!-- FANTASY PICKS -->
-        <tr><td style="background:#0d1a24;border-left:1px solid #1e2d38;border-right:1px solid #1e2d38;padding:16px 20px 8px;">
-          <p style="font-family:Arial,sans-serif;font-size:11px;font-weight:bold;letter-spacing:2px;color:#00c2ff;text-transform:uppercase;margin:0 0 12px;">🏒 Tonight's Picks · {fantasy.get("date_label","")}</p>
-          {"<p style='font-family:Arial,sans-serif;font-size:11px;font-weight:bold;letter-spacing:2px;color:#8fafc4;text-transform:uppercase;margin:0 0 10px;'>🥅 Goalie Starts</p>" + goalies_html if goalies_html else ""}
-          {"<p style='font-family:Arial,sans-serif;font-size:11px;font-weight:bold;letter-spacing:2px;color:#8fafc4;text-transform:uppercase;margin:16px 0 10px;'>📊 Top Props</p>" + props_html if props_html else ""}
-          <p style="font-family:Arial,sans-serif;font-size:12px;color:#8fafc4;margin:10px 0 0;">Full picks + goalie table → <a href="https://grindline.ca" style="color:#00c2ff;text-decoration:none;font-weight:bold;">grindline.ca</a></p>
+        <tr><td style="padding:0 20px 16px;">
+          <p style="font-family:{FONT};font-size:11px;font-weight:700;letter-spacing:2px;color:{BRIGHT};text-transform:uppercase;margin:0 0 10px;">Tonight's Picks · {fantasy.get("date_label","")}</p>
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation" bgcolor="{CARD}" style="background:{CARD};border:1px solid {BORDER};border-radius:12px;">
+            {sections}
+          </table>
+          <p style="font-family:{FONT};font-size:12px;color:{MUTED};margin:10px 0 0;">Full picks + goalie table → <a href="https://grindline.ca" style="color:{ACCENT};text-decoration:none;font-weight:700;">grindline.ca</a></p>
         </td></tr>'''
 
 # ── BUILD EMAIL HTML ──────────────────────────────────────────────────────────
 def build_email_html(games_with_signals, odds_data, day_label, yesterday_results=None, yesterday_date="", fantasy=None):
+    """Leads with tonight (Rest Edge headline if it fired, then the full
+    slate), then last night's compressed results, then picks. A Rest Edge
+    night gets an unmistakable green-accented headline card; a quiet night
+    still reads as a full email off the compact slate + results list rather
+    than empty space where the headline used to be."""
     signal_games = [g for g in games_with_signals if g["signal"] == "HIGH"]
-    regular_games = [g for g in games_with_signals if g["signal"] != "HIGH"]
 
-    def game_row(g, highlight=False):
+    def rest_edge_card(g):
         odds = match_odds(g, odds_data)
-        away_b2b_badge = '<span style="background:#ff4444;color:#fff;font-family:Arial,sans-serif;font-size:10px;font-weight:bold;padding:3px 7px;border-radius:3px;margin-left:6px;display:inline-block;">B2B</span>' if g["away_b2b"] else ""
-        home_b2b_badge = '<span style="background:#ff4444;color:#fff;font-family:Arial,sans-serif;font-size:10px;font-weight:bold;padding:3px 7px;border-radius:3px;margin-left:6px;display:inline-block;">B2B</span>' if g["home_b2b"] else ""
-        dk_home = format_american(odds.get("draftkings_home"))
-        fd_home = format_american(odds.get("fanduel_home"))
-        mgm_home = format_american(odds.get("betmgm_home"))
-        pin_home = format_american(odds.get("pinnacle_home"))
-        border_color = "#ff4444" if highlight == "HIGH" else "#2a3d4a"
-        bg_color = "rgba(255,68,68,0.08)" if highlight == "HIGH" else "#111d27"
-        signal_row = ""
-        if g["signal"] == "HIGH":
-            badge_bg = "#ff4444"
-            signal_row = f'''
-            <tr><td colspan="2" style="padding:4px 14px 10px;font-family:Arial,sans-serif;font-size:13px;font-weight:bold;color:{badge_bg};">
-              {g["signal_label"]} — {g["signal_detail"]}
-            </td></tr>'''
-        odds_row = ""
-        if any(v != "N/A" for v in [dk_home, fd_home, mgm_home, pin_home]):
-            def chip(book, val):
-                if val == "N/A": return ""
-                return f'<span style="background:#1e2d38;color:#adc8d8;font-family:Arial,sans-serif;font-size:11px;padding:4px 8px;border-radius:3px;margin-right:4px;display:inline-block;">{book} {val}</span>'
-            odds_row = f'''
-            <tr><td colspan="2" style="padding:2px 14px 10px;">
-              <span style="font-family:Arial,sans-serif;font-size:11px;color:#8fafc4;font-weight:bold;margin-right:8px;">HOME ML</span>
-              {chip("DK", dk_home)}{chip("FD", fd_home)}{chip("MGM", mgm_home)}{chip("PIN", pin_home)}
-            </td></tr>'''
+        def chip(book, val):
+            if val == "N/A":
+                return ""
+            return f'<span style="display:inline-block;background:rgba(61,220,151,0.1);color:{GREEN};border:1px solid rgba(61,220,151,0.3);font-family:{FONT};font-size:11px;font-weight:700;padding:4px 9px;border-radius:4px;margin-right:5px;">{book} {val}</span>'
+        odds_chips = (
+            chip("DK", format_american(odds.get("draftkings_home")))
+            + chip("FD", format_american(odds.get("fanduel_home")))
+            + chip("MGM", format_american(odds.get("betmgm_home")))
+            + chip("PIN", format_american(odds.get("pinnacle_home")))
+        )
+        odds_row = f'<div style="margin-top:12px;">{odds_chips}</div>' if odds_chips else ""
         return f'''
-        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;border:1px solid {border_color};border-radius:6px;background:{bg_color};">
+        <table width="100%" cellpadding="0" cellspacing="0" role="presentation" bgcolor="{CARD}" style="background:{CARD};border:1px solid rgba(61,220,151,0.4);border-radius:12px;margin-bottom:10px;">
           <tr>
-            <td style="padding:12px 14px 4px;word-break:break-word;">
-              <span style="font-family:Arial,sans-serif;font-size:17px;font-weight:bold;color:#ffffff;">{g["away"]}</span>{away_b2b_badge}
-              <span style="font-family:Arial,sans-serif;font-size:14px;color:#8fafc4;margin:0 8px;">@</span>
-              <span style="font-family:Arial,sans-serif;font-size:17px;font-weight:bold;color:#ffffff;">{g["home"]}</span>{home_b2b_badge}
+            <td width="5" bgcolor="{GREEN}" style="background:{GREEN};font-size:1px;line-height:1px;">&nbsp;</td>
+            <td style="padding:22px 24px;">
+              <span style="display:inline-block;background:rgba(61,220,151,0.12);color:{GREEN};border:1px solid rgba(61,220,151,0.3);font-family:{FONT};font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:5px 12px;border-radius:20px;">⚡ Rest Edge Fires Tonight</span>
+              <div style="font-family:{FONT};font-size:24px;font-weight:800;color:{BRIGHT};margin:16px 0 6px;">{g["away"]} @ {g["home"]}</div>
+              <div style="font-family:{FONT};font-size:13px;color:{TEXT};line-height:1.5;">{g["away"]} on the road, second night of a back-to-back · {g["home"]} rested exactly two days · {g["time_str"]}</div>
+              <div style="font-family:{FONT};font-size:17px;font-weight:800;color:{GREEN};margin-top:14px;">Back {g["home"]}</div>
+              {odds_row}
+              <div style="font-family:{FONT};font-size:11px;color:{MUTED};margin-top:14px;padding-top:12px;border-top:1px solid {BORDER};">62.1% win rate · +5.6% ROI · 509 games across four seasons</div>
             </td>
-            <td style="padding:12px 14px 4px;text-align:right;font-family:Arial,sans-serif;font-size:12px;color:#adc8d8;white-space:nowrap;">{g["time_str"]}</td>
           </tr>
-          {signal_row}
-          {odds_row}
         </table>'''
-    n_signals = len(signal_games)
-    signal_summary = f"{n_signals} Rest Edge game{'s' if n_signals != 1 else ''} tonight" if n_signals > 0 else "No Rest Edge games tonight"
-    signal_color = "#ff4444" if n_signals > 0 else "#5a7a8a"
-    signal_games_html = "".join(game_row(g, highlight=g["signal"]) for g in signal_games)
-    regular_games_html = "".join(game_row(g) for g in regular_games)
 
-    regular_section = ""
-    if regular_games:
-        regular_section = f'''
-        <tr><td style="background:#0d1a24;border-left:1px solid #1e2d38;border-right:1px solid #1e2d38;padding:20px 24px 8px;">
-         <p style="font-family:Arial,sans-serif;font-size:11px;font-weight:bold;letter-spacing:2px;color:#8fafc4;text-transform:uppercase;margin:0 0 12px;">Tonight\'s Full Slate</p>
-          {regular_games_html}
+    if signal_games:
+        headline_html = "".join(rest_edge_card(g) for g in signal_games)
+    else:
+        headline_html = f'''
+        <table width="100%" cellpadding="0" cellspacing="0" role="presentation" bgcolor="{CARD}" style="background:{CARD};border:1px solid {BORDER};border-radius:12px;margin-bottom:10px;">
+          <tr><td style="padding:16px 20px;">
+            <span style="font-family:{FONT};font-size:13px;font-weight:700;color:{TEXT};">No Rest Edge tonight</span>
+            <div style="font-family:{FONT};font-size:12px;color:{MUTED};margin-top:4px;line-height:1.5;">No game on the slate has an away team on a back-to-back with the home team rested exactly two days.</div>
+          </td></tr>
+        </table>'''
+
+    def slate_row(g, is_last):
+        tags = ""
+        if g["signal"] == "HIGH":
+            tags += f'<span style="display:inline-block;background:rgba(61,220,151,0.12);color:{GREEN};border:1px solid rgba(61,220,151,0.35);font-family:{FONT};font-size:9px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;padding:2px 7px;border-radius:3px;margin-left:6px;">Rest Edge</span>'
+        if g["away_b2b"]:
+            tags += f'<span style="display:inline-block;background:rgba(90,138,114,0.1);color:{MUTED};border:1px solid rgba(90,138,114,0.25);font-family:{FONT};font-size:9px;font-weight:700;letter-spacing:0.5px;padding:2px 7px;border-radius:3px;margin-left:6px;">{g["away"]} B2B</span>'
+        if g["home_b2b"]:
+            tags += f'<span style="display:inline-block;background:rgba(90,138,114,0.1);color:{MUTED};border:1px solid rgba(90,138,114,0.25);font-family:{FONT};font-size:9px;font-weight:700;letter-spacing:0.5px;padding:2px 7px;border-radius:3px;margin-left:6px;">{g["home"]} B2B</span>'
+        border_bottom = "" if is_last else f"border-bottom:1px solid {BORDER};"
+        return f'''
+        <tr><td style="padding:11px 20px;{border_bottom}">
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
+            <td style="font-family:{FONT};font-size:13px;font-weight:700;color:{BRIGHT};">{g["away"]} @ {g["home"]}{tags}</td>
+            <td align="right" style="white-space:nowrap;padding-left:10px;font-family:{FONT};font-size:12px;color:{MUTED};">{g["time_str"]}</td>
+          </tr></table>
         </td></tr>'''
+
+    slate_rows = "".join(slate_row(g, i == len(games_with_signals) - 1) for i, g in enumerate(games_with_signals))
+    slate_section = f'''
+        <tr><td style="padding:0 20px 16px;">
+          <p style="font-family:{FONT};font-size:11px;font-weight:700;letter-spacing:2px;color:{BRIGHT};text-transform:uppercase;margin:0 0 10px;">Tonight\'s Full Slate</p>
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation" bgcolor="{CARD}" style="background:{CARD};border:1px solid {BORDER};border-radius:12px;">
+            {slate_rows}
+          </table>
+        </td></tr>''' if games_with_signals else ""
 
     results_section = build_results_html(yesterday_results or [], yesterday_date)
     fantasy_section = build_fantasy_section(fantasy)
@@ -513,50 +551,46 @@ def build_email_html(games_with_signals, odds_data, day_label, yesterday_results
   <style>
     @media only screen and (max-width: 600px) {{
       .email-container {{ width: 100% !important; }}
-      .game-team {{ font-size: 14px !important; }}
       .hide-mobile {{ display: none !important; }}
-      td {{ padding-left: 12px !important; padding-right: 12px !important; }}
+      td {{ padding-left: 14px !important; padding-right: 14px !important; }}
     }}
   </style>
 </head>
-<body style="margin:0;padding:0;background:#0a0f14;font-family:sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0a0f14;">
-    <tr><td align="center" style="padding:16px 8px;">
-      <table class="email-container" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+<body style="margin:0;padding:0;background:{BG};font-family:{FONT};">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" bgcolor="{BG}" style="background:{BG};">
+    <tr><td align="center" style="padding:20px 8px;">
+      <table class="email-container" width="600" cellpadding="0" cellspacing="0" role="presentation" style="max-width:600px;width:100%;">
 
         <!-- HEADER -->
-        <tr><td style="background:#0d1a24;border:1px solid #1e2d38;border-radius:6px 6px 0 0;padding:20px 24px;">
-          <p style="font-family:monospace;font-size:9px;letter-spacing:3px;color:#00c2ff;text-transform:uppercase;margin:0 0 4px;">Grind Line</p>
-          <p style="font-family:monospace;font-size:20px;font-weight:bold;color:#e8f0f4;margin:0;">NHL Edge Report</p>
-          <p style="font-family:monospace;font-size:11px;color:#5a7a8a;margin:4px 0 0;">{day_label} · <a href="https://grindline.ca" style="color:#5a7a8a;text-decoration:none;">grindline.ca</a></p>
+        <tr><td style="padding:4px 20px 20px;">
+          <span style="font-family:{FONT};font-size:11px;font-weight:800;letter-spacing:2px;color:{ACCENT};text-transform:uppercase;">Grind Line</span>
+          <div style="font-family:{FONT};font-size:19px;font-weight:800;color:{BRIGHT};margin-top:6px;">NHL Edge Report</div>
+          <div style="font-family:{FONT};font-size:12px;color:{MUTED};margin-top:3px;">{day_label} · <a href="https://grindline.ca" style="color:{MUTED};text-decoration:none;">grindline.ca</a></div>
         </td></tr>
 
-        <!-- SIGNAL SUMMARY BAR -->
-        <tr><td style="background:#111d27;border-left:1px solid #1e2d38;border-right:1px solid #1e2d38;padding:12px 24px;">
-          <span style="font-family:monospace;font-size:12px;color:{signal_color};font-weight:bold;">{signal_summary}</span>
-          <span style="font-family:monospace;font-size:10px;color:#5a7a8a;margin-left:12px;">Rest Edge: away B2B, home rested exactly 2 days (62.1% · +5.6% ROI · 509 games, 4 seasons)</span>
+        <!-- TONIGHT -->
+        <tr><td style="padding:0 20px 10px;">
+          <p style="font-family:{FONT};font-size:11px;font-weight:700;letter-spacing:2px;color:{BRIGHT};text-transform:uppercase;margin:0 0 10px;">Tonight</p>
+          {headline_html}
         </td></tr>
+
+        <!-- FULL SLATE -->
+        {slate_section}
 
         <!-- LAST NIGHT\'S RESULTS -->
         {results_section}
-
-        <!-- SIGNAL GAMES -->
-        {'<tr><td style="background:#0d1a24;border-left:1px solid #1e2d38;border-right:1px solid #1e2d38;padding:16px 24px 8px;"><p style="font-family:monospace;font-size:9px;letter-spacing:2px;color:#ff4444;text-transform:uppercase;margin:0 0 10px;">⚡ Flagged Games</p>' + signal_games_html + '</td></tr>' if signal_games else ''}
-
-        <!-- ALL OTHER GAMES -->
-        {regular_section}
 
         <!-- FANTASY PICKS -->
         {fantasy_section}
 
         <!-- FOOTER -->
-        <tr><td style="background:#0d1a24;border:1px solid #1e2d38;border-radius:0 0 6px 6px;padding:16px 24px;text-align:center;">
-          <p style="font-family:monospace;font-size:9px;color:#5a7a8a;margin:0 0 6px;">
-            Full dashboard, live scores + DFS tools → <a href="https://grindline.ca" style="color:#00c2ff;text-decoration:none;">grindline.ca</a>
+        <tr><td style="padding:16px 20px 4px;border-top:1px solid {BORDER};text-align:center;">
+          <p style="font-family:{FONT};font-size:11px;color:{MUTED};margin:0 0 6px;">
+            Full dashboard, live scores + season board → <a href="https://grindline.ca" style="color:{ACCENT};text-decoration:none;">grindline.ca</a>
           </p>
-          <p style="font-family:monospace;font-size:8px;color:#2a3d4a;margin:0;">
+          <p style="font-family:{FONT};font-size:10px;color:{MUTED};margin:0;">
             Grind Line · Statistical analysis for research purposes only · Not betting advice ·
-            <a href="*|UNSUBSCRIBE|*" style="color:#2a3d4a;">Unsubscribe</a>
+            <a href="*|UNSUBSCRIBE|*" style="color:{MUTED};">Unsubscribe</a>
           </p>
         </td></tr>
 
@@ -568,36 +602,48 @@ def build_email_html(games_with_signals, odds_data, day_label, yesterday_results
     return html
 # ── BUILD PLAIN TEXT VERSION ──────────────────────────────────────────────────
 def build_email_text(games_with_signals, day_label, yesterday_results=None, yesterday_date="", fantasy=None):
+    """Mirrors the HTML: tonight leads (Rest Edge headline or a plain
+    no-edge line), then the full slate, then a tight one-line-per-game
+    results list, then picks."""
     lines = [
         f"Grind Line — NHL Edge Report — {day_label}",
         "=" * 50,
         ""
     ]
 
-    if yesterday_results:
-        date_label = datetime.strptime(yesterday_date, "%Y-%m-%d").strftime("%a %b %-d") if yesterday_date else "Yesterday"
-        lines.append(f"📊 LAST NIGHT'S RESULTS — {date_label}:")
-        for r in yesterday_results:
-            result = "✅ WIN" if r["fade_won"] else "❌ LOSS"
-            lines.append(f"  {r['away']} @ {r['home']} — {r['score_str']} — {result}")
-            lines.append(f"  {r['signal_label']} · Fade {r['away']}")
-            lines.append("")
-
     signal_games = [g for g in games_with_signals if g["signal"] == "HIGH"]
     if signal_games:
-        lines.append("⚡ REST EDGE GAMES TONIGHT:")
+        lines.append("⚡ REST EDGE FIRES TONIGHT:")
         for g in signal_games:
             lines.append(f"  {g['away']} @ {g['home']} — {g['time_str']}")
-            lines.append(f"  {g['signal_label']}: {g['signal_detail']}")
+            lines.append(f"  {g['signal_detail']}")
+            lines.append("  62.1% win rate · +5.6% ROI · 509 games across four seasons")
             lines.append("")
     else:
-        lines.append("No Rest Edge games tonight.")
+        lines.append("No Rest Edge tonight — no away-B2B/home-rested-2 matchup on the slate.")
         lines.append("")
 
     lines.append("FULL SLATE:")
     for g in games_with_signals:
-        b2b = " [B2B]" if g["away_b2b"] or g["home_b2b"] else ""
-        lines.append(f"  {g['away']} @ {g['home']} — {g['time_str']}{b2b}")
+        tags = []
+        if g["signal"] == "HIGH":
+            tags.append("REST EDGE")
+        if g["away_b2b"]:
+            tags.append(f"{g['away']} B2B")
+        if g["home_b2b"]:
+            tags.append(f"{g['home']} B2B")
+        tag_str = f" [{', '.join(tags)}]" if tags else ""
+        lines.append(f"  {g['away']} @ {g['home']} — {g['time_str']}{tag_str}")
+
+    if yesterday_results:
+        date_label = datetime.strptime(yesterday_date, "%Y-%m-%d").strftime("%a %b %-d") if yesterday_date else "Yesterday"
+        lines.append("")
+        lines.append(f"LAST NIGHT — {date_label}:")
+        for r in yesterday_results:
+            won = r["fade_won"]
+            result = "WIN" if won is True else "LOSS" if won is False else "no signal"
+            note = " (Rest Edge)" if r["signal_label"] != "No Signal" else ""
+            lines.append(f"  {r['away']} {r['away_score']} @ {r['home']} {r['home_score']} — {result}{note}")
 
     if fantasy:
         gs = fantasy.get("goalie_starts", {})
