@@ -11,6 +11,8 @@ import json
 from datetime import datetime, timedelta
 import pytz
 
+from rest_edge import is_rest_edge, is_cancelled
+
 # ── CONFIG ────────────────────────────────────────────────────────────────────
 BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "YOUR_BREVO_API_KEY_HERE")
 ODDS_API_KEY  = os.environ.get("ODDS_API_KEY", "YOUR_ODDS_API_KEY_HERE")
@@ -105,9 +107,9 @@ def fetch_yesterday_scores():
 # ── GET YESTERDAY'S SIGNAL RESULTS ───────────────────────────────────────────
 def get_yesterday_signals(scores):
     """
-    For each completed game yesterday, check if Signal 1 was active.
-    Signal 1: away team on B2B, home team rested 3+ days.
-    We re-derive B2B by checking two days ago schedule.
+    For each completed game yesterday, check if Rest Edge fired: away team
+    on a back-to-back, home team rested exactly two days (see rest_edge.py).
+    We re-derive rest days by checking the last two nights' schedules.
     Returns list of result dicts for flagged games only.
     """
     if not scores:
@@ -148,24 +150,13 @@ def get_yesterday_signals(scores):
         away = g["away"]
         home = g["home"]
 
-        away_b2b = away in played_two_days_ago
-        home_b2b = home in played_two_days_ago
+        # Rest days as of yesterday: 1 = played yesterday (B2B), 2 = played
+        # two nights ago (one day off), 3 = neither (2+ days off).
+        away_rest = 1 if away in played_two_days_ago else (2 if away in played_three_days_ago else 3)
+        home_rest = 1 if home in played_two_days_ago else (2 if home in played_three_days_ago else 3)
+        away_b2b = away_rest == 1
 
-        # Home rest days as of yesterday
-        if home in played_two_days_ago:
-            home_rest = 1
-        elif home in played_three_days_ago:
-            home_rest = 2
-        else:
-            home_rest = 3
-
-        # Signal 1 conditions
-        if away_b2b and not home_b2b and home_rest >= 3:
-            signal_label = "Signal 1"
-        elif away_b2b and not home_b2b and home_rest == 2:
-            signal_label = "Signal 1 Partial"
-        else:
-            signal_label = "No Signal"
+        signal_label = "Rest Edge" if is_rest_edge(away_rest, home_rest) else "No Signal"
 
         # Did the fade win? We fade the away team = home team wins
         home_won = g["home_score"] > g["away_score"]
@@ -291,17 +282,13 @@ def detect_signals(games, b2b_teams, played_yesterday, played_two_days_ago):
         signal = None
         signal_label = ""
         signal_detail = ""
-        if away_b2b and not home_b2b and home_rest >= 3:
+        if is_rest_edge(away_rest, home_rest):
             signal = "HIGH"
-            signal_label = "⚡ SIGNAL 1 ACTIVE"
-            signal_detail = f"{away} on B2B · {home} rested {home_rest}+ days ·"
-        elif away_b2b and not home_b2b and home_rest == 2:
-            signal = "MID"
-            signal_label = "⚠ SIGNAL 1 PARTIAL"
-            signal_detail = f"{away} on B2B · {home} rested 2 days"
-        elif away_b2b and home_b2b:
+            signal_label = "⚡ REST EDGE"
+            signal_detail = f"{away} on B2B · {home} rested 2 days · back {home}"
+        elif is_cancelled(away_rest, home_rest):
             signal = "CANCEL"
-            signal_label = "↔ SIGNALS CANCEL"
+            signal_label = "↔ NO EDGE — BOTH B2B"
             signal_detail = "Both teams on B2B — no situational edge"
         try:
             utc_time = datetime.strptime(g["start_time_utc"], "%Y-%m-%dT%H:%M:%SZ")
@@ -321,7 +308,7 @@ def detect_signals(games, b2b_teams, played_yesterday, played_two_days_ago):
             "home_rest": home_rest,
             "time_str": time_str
         })
-    order = {"HIGH": 0, "MID": 1, "CANCEL": 2, None: 3}
+    order = {"HIGH": 0, "CANCEL": 1, None: 2}
     flagged.sort(key=lambda x: order.get(x["signal"], 3))
     return flagged
 
@@ -530,8 +517,8 @@ def build_playoff_section(playoff_data):
 
 # ── BUILD EMAIL HTML ──────────────────────────────────────────────────────────
 def build_email_html(games_with_signals, odds_data, day_label, yesterday_results=None, yesterday_date="", fantasy=None, playoff_data=None):
-    signal_games = [g for g in games_with_signals if g["signal"] in ("HIGH", "MID")]
-    regular_games = [g for g in games_with_signals if g["signal"] not in ("HIGH", "MID")]
+    signal_games = [g for g in games_with_signals if g["signal"] == "HIGH"]
+    regular_games = [g for g in games_with_signals if g["signal"] != "HIGH"]
 
     def game_row(g, highlight=False):
         odds = match_odds(g, odds_data)
@@ -541,11 +528,11 @@ def build_email_html(games_with_signals, odds_data, day_label, yesterday_results
         fd_home = format_american(odds.get("fanduel_home"))
         mgm_home = format_american(odds.get("betmgm_home"))
         pin_home = format_american(odds.get("pinnacle_home"))
-        border_color = "#ff4444" if highlight == "HIGH" else "#ffb020" if highlight == "MID" else "#2a3d4a"
-        bg_color = "rgba(255,68,68,0.08)" if highlight == "HIGH" else "rgba(255,176,32,0.08)" if highlight == "MID" else "#111d27"
+        border_color = "#ff4444" if highlight == "HIGH" else "#2a3d4a"
+        bg_color = "rgba(255,68,68,0.08)" if highlight == "HIGH" else "#111d27"
         signal_row = ""
-        if g["signal"] in ("HIGH", "MID"):
-            badge_bg = "#ff4444" if g["signal"] == "HIGH" else "#ffb020"
+        if g["signal"] == "HIGH":
+            badge_bg = "#ff4444"
             signal_row = f'''
             <tr><td colspan="2" style="padding:4px 14px 10px;font-family:Arial,sans-serif;font-size:13px;font-weight:bold;color:{badge_bg};">
               {g["signal_label"]} — {g["signal_detail"]}
@@ -574,7 +561,7 @@ def build_email_html(games_with_signals, odds_data, day_label, yesterday_results
           {odds_row}
         </table>'''
     n_signals = len(signal_games)
-    signal_summary = f"{n_signals} signal game{'s' if n_signals != 1 else ''} tonight" if n_signals > 0 else "No high-confidence signals tonight"
+    signal_summary = f"{n_signals} Rest Edge game{'s' if n_signals != 1 else ''} tonight" if n_signals > 0 else "No Rest Edge games tonight"
     signal_color = "#ff4444" if n_signals > 0 else "#5a7a8a"
     signal_games_html = "".join(game_row(g, highlight=g["signal"]) for g in signal_games)
     regular_games_html = "".join(game_row(g) for g in regular_games)
@@ -620,7 +607,7 @@ def build_email_html(games_with_signals, odds_data, day_label, yesterday_results
         <!-- SIGNAL SUMMARY BAR -->
         <tr><td style="background:#111d27;border-left:1px solid #1e2d38;border-right:1px solid #1e2d38;padding:12px 24px;">
           <span style="font-family:monospace;font-size:12px;color:{signal_color};font-weight:bold;">{signal_summary}</span>
-          <span style="font-family:monospace;font-size:10px;color:#5a7a8a;margin-left:12px;">Signal 1: B2B + rest differential </span>
+          <span style="font-family:monospace;font-size:10px;color:#5a7a8a;margin-left:12px;">Rest Edge: away B2B, home rested exactly 2 days (62.1% · +5.6% ROI · 509 games, 4 seasons)</span>
         </td></tr>
 
         <!-- LAST NIGHT\'S RESULTS -->
@@ -672,15 +659,15 @@ def build_email_text(games_with_signals, day_label, yesterday_results=None, yest
             lines.append(f"  {r['signal_label']} · Fade {r['away']}")
             lines.append("")
 
-    signal_games = [g for g in games_with_signals if g["signal"] in ("HIGH", "MID")]
+    signal_games = [g for g in games_with_signals if g["signal"] == "HIGH"]
     if signal_games:
-        lines.append("⚡ FLAGGED GAMES TONIGHT:")
+        lines.append("⚡ REST EDGE GAMES TONIGHT:")
         for g in signal_games:
             lines.append(f"  {g['away']} @ {g['home']} — {g['time_str']}")
             lines.append(f"  {g['signal_label']}: {g['signal_detail']}")
             lines.append("")
     else:
-        lines.append("No high-confidence signals tonight.")
+        lines.append("No Rest Edge games tonight.")
         lines.append("")
 
     lines.append("FULL SLATE:")
@@ -777,7 +764,7 @@ def main():
     print("Detecting signals...")
     games_with_signals = detect_signals(games, b2b_teams, played_yesterday, played_two_days_ago)
     n_signals = sum(1 for g in games_with_signals if g["signal"] == "HIGH")
-    print(f"Signal 1 active in {n_signals} game(s) tonight")
+    print(f"Rest Edge active in {n_signals} game(s) tonight")
 
     # 4. Fetch yesterday's scores and signal results
     print("Fetching yesterday's results...")
