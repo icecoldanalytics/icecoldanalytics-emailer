@@ -594,8 +594,10 @@ def _email_html_shell(title, day_label, body_html):
             Full dashboard, live scores + season board → <a href="https://grindline.ca" style="color:{ACCENT};text-decoration:none;">grindline.ca</a>
           </p>
           <p style="font-family:{FONT};font-size:10px;color:{MUTED};margin:0;">
-            Grind Line · Statistical analysis for research purposes only · Not betting advice ·
-            <a href="*|UNSUBSCRIBE|*" style="color:{MUTED};">Unsubscribe</a>
+            Grind Line · Statistical analysis for research purposes only · Not betting advice
+          </p>
+          <p style="font-family:{FONT};font-size:10px;color:{MUTED};margin:4px 0 0;">
+            Reply to this email to unsubscribe.
           </p>
         </td></tr>
 
@@ -659,7 +661,7 @@ def build_email_text(games_with_signals, day_label, yesterday_results=None, yest
             note = " (Rest Edge)" if r["signal_label"] != "No Signal" else ""
             lines.append(f"  {r['away']} {r['away_score']} @ {r['home']} {r['home_score']} — {result}{note}")
 
-    lines += ["", "grindline.ca", "Not betting advice — for research purposes only"]
+    lines += ["", "grindline.ca", "Not betting advice — for research purposes only", "Reply to this email to unsubscribe."]
     return "\n".join(lines)
 
 
@@ -692,7 +694,7 @@ def build_fantasy_email_text(fantasy, day_label):
         lines.append("")
 
     lines.append("Full Season Board — goalie table, usage leaders, weekly workload:")
-    lines += ["  grindline.ca", "", "Not betting advice — for research purposes only"]
+    lines += ["  grindline.ca", "", "Not betting advice — for research purposes only", "Reply to this email to unsubscribe."]
     return "\n".join(lines)
 
 # ── FETCH BREVO CONTACTS ──────────────────────────────────────────────────────
