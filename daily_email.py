@@ -395,41 +395,19 @@ def fetch_fantasy_picks():
 
 
 def build_fantasy_section(fantasy):
-    """Build a condensed goalie-starts + props section for email. There is
-    no value_plays anymore - update_fantasy.py's output dict only carries
-    goalie_starts and player_props (market/line/side/odds/book/confidence),
-    not the old tier/dk_salary/prop_type/pick schema this used to read."""
+    """Build a condensed goalie-starts section for email. Props are
+    deliberately not read here even though fantasy.json still carries a
+    player_props field - the site split into betting.html/fantasy.html,
+    props moved to betting.html's Props page, and this fantasy-only email
+    should not show them anymore."""
     if not fantasy:
         return ""
 
-    pp = fantasy.get("player_props", {})
-    props = pp.get("props", [])[:5]
     gs = fantasy.get("goalie_starts", {})
     goalies = [g for g in gs.get("goalies", []) if g.get("recommendation") == "start"][:2]
 
-    if not props and not goalies:
+    if not goalies:
         return ""
-
-    props_html = ""
-    for i, p in enumerate(props):
-        side = p.get("side", "")
-        side_color = GREEN if side.lower() == "over" else RED if side.lower() == "under" else ACCENT
-        side_bg = "rgba(61,220,151,0.12)" if side.lower() == "over" else "rgba(255,71,87,0.12)" if side.lower() == "under" else "rgba(0,196,106,0.12)"
-        side_border = "rgba(61,220,151,0.35)" if side.lower() == "over" else "rgba(255,71,87,0.3)" if side.lower() == "under" else "rgba(0,196,106,0.3)"
-        reason = p.get("reason", "")
-        border_bottom = f"border-bottom:1px solid {BORDER};" if i < len(props) - 1 else ""
-        props_html += f'''
-        <tr><td style="padding:11px 20px;{border_bottom}">
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
-            <td style="font-family:{FONT};font-size:13px;font-weight:700;color:{BRIGHT};">{p.get("player","")} <span style="font-weight:400;color:{MUTED};">— {p.get("market","")}</span></td>
-            <td align="right" style="white-space:nowrap;padding-left:10px;">
-              <span style="display:inline-block;background:{side_bg};color:{side_color};border:1px solid {side_border};font-family:{FONT};font-size:10px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;padding:3px 9px;border-radius:4px;">{side.upper()} {p.get("line","")}</span>
-              <span style="font-family:{FONT};font-size:11px;color:{MUTED};margin-left:6px;">{p.get("odds","")}</span>
-            </td>
-          </tr></table>
-          <div style="font-family:{FONT};font-size:11px;color:{MUTED};margin-top:3px;">{p.get("game","")} · {p.get("book","")} · {p.get("confidence","")} confidence</div>
-          <div style="font-family:{FONT};font-size:12px;color:{TEXT};margin-top:4px;">{reason[:140]}{"..." if len(reason) > 140 else ""}</div>
-        </td></tr>'''
 
     goalies_html = ""
     for i, g in enumerate(goalies):
@@ -446,15 +424,9 @@ def build_fantasy_section(fantasy):
           <div style="font-family:{FONT};font-size:11px;color:{MUTED};margin-top:3px;">{g.get("team","")} vs {g.get("opponent","")} · {g.get("gaa") or "—"} GAA{(" · " + g["rest_note"]) if g.get("rest_note") else ""}</div>
         </td></tr>'''
 
-    sections = ""
-    if goalies_html:
-        sections += f'''
+    sections = f'''
         <tr><td style="padding:14px 20px 4px;font-family:{FONT};font-size:10px;font-weight:700;letter-spacing:1.5px;color:{MUTED};text-transform:uppercase;">Goalie Starts</td></tr>
         {goalies_html}'''
-    if props_html:
-        sections += f'''
-        <tr><td style="padding:14px 20px 4px;font-family:{FONT};font-size:10px;font-weight:700;letter-spacing:1.5px;color:{MUTED};text-transform:uppercase;">Top Props</td></tr>
-        {props_html}'''
 
     return f'''
         <!-- FANTASY PICKS -->
@@ -463,7 +435,7 @@ def build_fantasy_section(fantasy):
           <table width="100%" cellpadding="0" cellspacing="0" role="presentation" bgcolor="{CARD}" style="background:{CARD};border:1px solid {BORDER};border-radius:12px;">
             {sections}
           </table>
-          <p style="font-family:{FONT};font-size:12px;color:{MUTED};margin:10px 0 0;">Full Season Board — goalie table, usage leaders, weekly workload → <a href="https://grindline.ca" style="color:{ACCENT};text-decoration:none;font-weight:700;">grindline.ca</a></p>
+          <p style="font-family:{FONT};font-size:12px;color:{MUTED};margin:10px 0 0;">Full Season Board — goalie table, usage leaders, weekly workload → <a href="https://grindline.ca/fantasy.html" style="color:{ACCENT};text-decoration:none;font-weight:700;">grindline.ca/fantasy.html</a></p>
         </td></tr>'''
 
 # ── BUILD EMAIL HTML ──────────────────────────────────────────────────────────
@@ -555,13 +527,20 @@ def build_email_html(games_with_signals, odds_data, day_label, yesterday_results
         <!-- LAST NIGHT\'S RESULTS -->
         {results_section}'''
 
-    return _email_html_shell("NHL Edge Report", day_label, body_html)
+    return _email_html_shell(
+        "NHL Edge Report", day_label, body_html,
+        home_url="https://grindline.ca/betting.html",
+        footer_tagline="Full dashboard, live scores, Signal Tracker &amp; props",
+    )
 
 
-def _email_html_shell(title, day_label, body_html):
+def _email_html_shell(title, day_label, body_html, home_url, footer_tagline):
     """Shared page chrome (head, header, footer) for both the Rest Edge
-    and fantasy-picks emails - same brand wordmark and footer disclaimer,
-    different title and body content per send."""
+    and fantasy-picks emails - same brand wordmark, different title, body
+    content, home link and footer tagline per send. home_url and
+    footer_tagline are required (not defaulted) since grindline.ca split
+    into betting.html/fantasy.html and each send must point at its own
+    side, never at a bare grindline.ca that no longer represents either."""
     return f'''<!DOCTYPE html>
 <html>
 <head>
@@ -584,14 +563,14 @@ def _email_html_shell(title, day_label, body_html):
         <tr><td style="padding:4px 20px 20px;">
           <span style="font-family:{FONT};font-size:11px;font-weight:800;letter-spacing:2px;color:{ACCENT};text-transform:uppercase;">Grind Line</span>
           <div style="font-family:{FONT};font-size:19px;font-weight:800;color:{BRIGHT};margin-top:6px;">{title}</div>
-          <div style="font-family:{FONT};font-size:12px;color:{MUTED};margin-top:3px;">{day_label} · <a href="https://grindline.ca" style="color:{MUTED};text-decoration:none;">grindline.ca</a></div>
+          <div style="font-family:{FONT};font-size:12px;color:{MUTED};margin-top:3px;">{day_label} · <a href="{home_url}" style="color:{MUTED};text-decoration:none;">{home_url.replace("https://", "")}</a></div>
         </td></tr>
         {body_html}
 
         <!-- FOOTER -->
         <tr><td style="padding:16px 20px 4px;border-top:1px solid {BORDER};text-align:center;">
           <p style="font-family:{FONT};font-size:11px;color:{MUTED};margin:0 0 6px;">
-            Full dashboard, live scores + season board → <a href="https://grindline.ca" style="color:{ACCENT};text-decoration:none;">grindline.ca</a>
+            {footer_tagline} → <a href="{home_url}" style="color:{ACCENT};text-decoration:none;">{home_url.replace("https://", "")}</a>
           </p>
           <p style="font-family:{FONT};font-size:10px;color:{MUTED};margin:0;">
             Grind Line · Statistical analysis for research purposes only · Not betting advice
@@ -609,11 +588,16 @@ def _email_html_shell(title, day_label, body_html):
 
 
 def build_fantasy_email_html(fantasy, day_label):
-    """Standalone fantasy-picks email: goalie starts + props only, same
-    page chrome as the Rest Edge email. fantasy must already be validated
-    non-empty by the caller - this does not itself decide whether to send."""
+    """Standalone fantasy-picks email: goalie starts only (props live on
+    betting.html now), same page chrome as the Rest Edge email but linking
+    to fantasy.html throughout. fantasy must already be validated non-empty
+    by the caller - this does not itself decide whether to send."""
     body_html = build_fantasy_section(fantasy)
-    return _email_html_shell("Fantasy Picks", day_label, body_html)
+    return _email_html_shell(
+        "Fantasy Picks", day_label, body_html,
+        home_url="https://grindline.ca/fantasy.html",
+        footer_tagline="Full Season Board, Players &amp; schedule analysis",
+    )
 
 
 # ── BUILD PLAIN TEXT VERSION ──────────────────────────────────────────────────
@@ -661,12 +645,14 @@ def build_email_text(games_with_signals, day_label, yesterday_results=None, yest
             note = " (Rest Edge)" if r["signal_label"] != "No Signal" else ""
             lines.append(f"  {r['away']} {r['away_score']} @ {r['home']} {r['home_score']} — {result}{note}")
 
-    lines += ["", "grindline.ca", "Not betting advice — for research purposes only", "Reply to this email to unsubscribe."]
+    lines += ["", "grindline.ca/betting.html", "Not betting advice — for research purposes only", "Reply to this email to unsubscribe."]
     return "\n".join(lines)
 
 
 def build_fantasy_email_text(fantasy, day_label):
-    """Standalone fantasy-picks email, plain-text version. fantasy must
+    """Standalone fantasy-picks email, plain-text version: goalie starts
+    only. Props are deliberately not read here (see build_fantasy_section's
+    docstring) - they moved to betting.html's Props page. fantasy must
     already be validated non-empty by the caller."""
     lines = [
         f"Grind Line — Fantasy Picks — {day_label}",
@@ -676,8 +662,6 @@ def build_fantasy_email_text(fantasy, day_label):
 
     gs = fantasy.get("goalie_starts", {})
     goalies = [g for g in gs.get("goalies", []) if g.get("recommendation") == "start"][:2]
-    pp = fantasy.get("player_props", {})
-    props = pp.get("props", [])[:5]
 
     if goalies:
         lines.append("GOALIE STARTS:")
@@ -685,16 +669,8 @@ def build_fantasy_email_text(fantasy, day_label):
             lines.append(f"  {g.get('name','')} ({g.get('team','')} vs {g.get('opponent','')}) — {g.get('sv_pct') or '—'} SV%, {g.get('gaa') or '—'} GAA")
         lines.append("")
 
-    if props:
-        lines.append("TOP PROPS:")
-        for p in props:
-            side = p.get("side", "")
-            line_part = f" {p.get('line','')}" if p.get("line") else ""
-            lines.append(f"  {p.get('player','')} — {p.get('market','')} {side.upper()}{line_part} ({p.get('odds','')} {p.get('book','')})")
-        lines.append("")
-
     lines.append("Full Season Board — goalie table, usage leaders, weekly workload:")
-    lines += ["  grindline.ca", "", "Not betting advice — for research purposes only", "Reply to this email to unsubscribe."]
+    lines += ["  grindline.ca/fantasy.html", "", "Not betting advice — for research purposes only", "Reply to this email to unsubscribe."]
     return "\n".join(lines)
 
 # ── FETCH BREVO CONTACTS ──────────────────────────────────────────────────────
@@ -812,12 +788,15 @@ def send_rest_edge_email():
 
 
 def send_fantasy_email():
-    """The 17:30 UTC send: goalie starts, props, link to the Season Board.
-    Runs 30 minutes after the fantasy pipeline writes fantasy.json, so the
-    date guard in fetch_fantasy_picks should pass under normal operation.
-    If it doesn't - stale data, fetch failure, or a valid-but-empty payload
-    (e.g. an off-season placeholder with no goalies/props) - this skips the
-    send entirely rather than mail out an empty shell."""
+    """The 17:30 UTC send: goalie starts and a link to the Season Board.
+    No props - those moved to betting.html's Props page when the site
+    split, and this send should not show them anymore even though
+    fantasy.json still carries a player_props field. Runs 30 minutes after
+    the fantasy pipeline writes fantasy.json, so the date guard in
+    fetch_fantasy_picks should pass under normal operation. If it doesn't
+    - stale data, fetch failure, or a valid-but-empty payload (e.g. an
+    off-season placeholder with no goalie starts) - this skips the send
+    entirely rather than mail out an empty shell."""
     day_label, today_str = get_today_str()
 
     print("Fetching fantasy picks...")
@@ -828,12 +807,11 @@ def send_fantasy_email():
 
     gs = fantasy.get("goalie_starts", {})
     goalies = [g for g in gs.get("goalies", []) if g.get("recommendation") == "start"]
-    props = fantasy.get("player_props", {}).get("props", [])
-    if not goalies and not props:
-        print("Fantasy data has no goalie starts or props today — skipping send")
+    if not goalies:
+        print("Fantasy data has no goalie starts today — skipping send")
         return
 
-    print(f"Building fantasy email ({len(goalies)} goalie start(s), {len(props)} prop(s))...")
+    print(f"Building fantasy email ({len(goalies)} goalie start(s))...")
     subject = f"🏒 Grind Line Fantasy Picks — {day_label}"
     html_content = build_fantasy_email_html(fantasy, day_label)
     text_content = build_fantasy_email_text(fantasy, day_label)
