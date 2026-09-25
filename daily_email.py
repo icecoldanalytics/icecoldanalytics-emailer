@@ -34,6 +34,7 @@ ACCENT  = "#00c46a"   # brand green / CTAs          (site --accent)
 GREEN   = "#3ddc97"   # win / Rest Edge fired        (site --green)
 RED     = "#ff4757"   # loss                        (site --red)
 GOLD    = "#f5a623"   # confidence / secondary badge (site --gold)
+CYAN    = "#00e88a"   # Emerging Edge accent        (site betting.html --cyan)
 TEXT    = "#c5e8d5"   # body copy                   (site --text)
 MUTED   = "#5a8a72"   # secondary/meta text         (site --muted)
 BRIGHT  = "#ffffff"   # headings                    (site --bright)
@@ -438,13 +439,101 @@ def build_fantasy_section(fantasy):
           <p style="font-family:{FONT};font-size:12px;color:{MUTED};margin:10px 0 0;">Full Season Board — goalie table, usage leaders, weekly workload → <a href="https://grindline.ca/fantasy.html" style="color:{ACCENT};text-decoration:none;font-weight:700;">grindline.ca/fantasy.html</a></p>
         </td></tr>'''
 
+def fmt_pct(v):
+    if v is None:
+        return "—"
+    return f"{'+' if v >= 0 else ''}{v}%"
+
+
+def fetch_emerging_edge_backtest():
+    """Backtest validation numbers for the Emerging Edge section, fetched
+    fresh each send from grindline.ca - no filesystem access between
+    these two repos, same HTTP-only convention as fetch_fantasy_picks.
+    Not date-gated like fantasy.json: this is a backtest result (four
+    completed seasons), not daily data, so there's no "today's version"
+    to check staleness against - it's the same file every day until the
+    backtest itself is re-run."""
+    try:
+        r = requests.get("https://grindline.ca/data/goalie_overlay_broad_backtest.json", timeout=10)
+        r.raise_for_status()
+        return r.json()
+    except Exception as e:
+        print(f"Emerging Edge backtest fetch error: {e}")
+        return None
+
+
+def build_emerging_edge_html(backtest):
+    """Static, evergreen block - NOT tied to tonight's slate. Unlike Rest
+    Edge, whether a game qualifies depends on which goalie the away team
+    actually starts, and that isn't knowable before puck drop (the same
+    reason capture_signals.py logs it null and resolves it after the
+    game on grindline's side) - so this never claims "fires tonight",
+    only presents the tracked pattern itself, framed exactly as
+    betting.html's Emerging Edge section: a tracked pattern acted on,
+    explicitly not validated the way Rest Edge is, with the interval and
+    the retirement test stated plainly, and the promise that results get
+    published here either way."""
+    if not backtest:
+        return ""
+    num1 = (backtest.get("goalie_overlay_broad_number_one") or {}).get("pooled") or {}
+    backup = (backtest.get("goalie_overlay_broad_backup") or {}).get("pooled") or {}
+    if not num1.get("n"):
+        return ""
+    ci = num1.get("roi_ci95") or [None, None]
+
+    return f'''
+    <tr><td style="padding:0 20px 16px;">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" bgcolor="{CARD}" style="background:{CARD};border:1px solid rgba(0,232,138,0.35);border-radius:12px;">
+        <tr>
+          <td width="5" bgcolor="{CYAN}" style="background:{CYAN};font-size:1px;line-height:1px;">&nbsp;</td>
+          <td style="padding:18px 20px;">
+            <span style="display:inline-block;background:rgba(0,232,138,0.12);color:{CYAN};border:1px solid rgba(0,232,138,0.3);font-family:{FONT};font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:4px 10px;border-radius:20px;">Emerging Edge</span>
+            <div style="font-family:{FONT};font-size:15px;font-weight:800;color:{BRIGHT};margin:10px 0 6px;">Goalie Overlay — a tracked pattern, not yet a validated signal</div>
+            <div style="font-family:{FONT};font-size:12px;color:{TEXT};line-height:1.6;">Away team on a back-to-back, home team rested (any amount — not the exact two days Rest Edge requires), and the away team starts its own #1 goalie by cumulative starts this season. Back the home side.</div>
+            <div style="font-family:{FONT};font-size:12px;color:{TEXT};line-height:1.6;margin-top:10px;">{num1["n"]} games across four seasons, {num1["win_rate"]}% win rate, {fmt_pct(num1["roi"])} ROI at real closing prices, 95% CI {fmt_pct(ci[0])} to {fmt_pct(ci[1])} — positive in all four individual seasons, but that interval still includes zero. Not validated the way Rest Edge is (509 games).</div>
+            <div style="font-family:{FONT};font-size:11px;color:{MUTED};line-height:1.6;margin-top:10px;">Comparison — away starts a backup instead: {backup.get("n","—")} games, {backup.get("win_rate","—")}% win rate, {fmt_pct(backup.get("roi"))} ROI — essentially flat.</div>
+            <div style="font-family:{FONT};font-size:11px;color:{MUTED};line-height:1.6;margin-top:10px;padding-top:10px;border-top:1px solid {BORDER};">Tracked live from opening night. If the live sample's first 100 games run net negative, Emerging Edge gets retired publicly — the same predetermined rule Signal 1 was retired under. Results published here either way. Full detail → <a href="https://grindline.ca/betting.html" style="color:{CYAN};text-decoration:none;font-weight:700;">grindline.ca/betting.html</a></div>
+          </td>
+        </tr>
+      </table>
+    </td></tr>'''
+
+
+def build_emerging_edge_text(backtest):
+    """Plain-text mirror of build_emerging_edge_html - same content, same
+    "not tied to tonight" framing."""
+    if not backtest:
+        return []
+    num1 = (backtest.get("goalie_overlay_broad_number_one") or {}).get("pooled") or {}
+    backup = (backtest.get("goalie_overlay_broad_backup") or {}).get("pooled") or {}
+    if not num1.get("n"):
+        return []
+    ci = num1.get("roi_ci95") or [None, None]
+
+    return [
+        "EMERGING EDGE — GOALIE OVERLAY (tracked pattern, not yet a validated signal):",
+        "  Away B2B + home rested (any amount, not just Rest Edge's exact 2 days) +",
+        "  away starts its own #1 goalie by cumulative starts -> back home.",
+        f"  {num1['n']} games across four seasons, {num1['win_rate']}% win rate, {fmt_pct(num1['roi'])} ROI at real",
+        f"  closing prices, 95% CI {fmt_pct(ci[0])} to {fmt_pct(ci[1])} — positive in all four seasons, but",
+        "  that interval still includes zero. Not validated the way Rest Edge is (509 games).",
+        f"  Comparison (away starts a backup instead): {backup.get('n','—')} games, {backup.get('win_rate','—')}% win rate, {fmt_pct(backup.get('roi'))} ROI — essentially flat.",
+        "  Tracked live from opening night. If the live sample's first 100 games run net",
+        "  negative, Emerging Edge gets retired publicly — same rule Signal 1 was retired under.",
+        "  Results published either way. Full detail: grindline.ca/betting.html",
+        "",
+    ]
+
+
 # ── BUILD EMAIL HTML ──────────────────────────────────────────────────────────
-def build_email_html(games_with_signals, odds_data, day_label, yesterday_results=None, yesterday_date=""):
+def build_email_html(games_with_signals, odds_data, day_label, yesterday_results=None, yesterday_date="", emerging_backtest=None):
     """Leads with tonight (Rest Edge headline if it fired, then the full
-    slate), then last night's compressed results, then picks. A Rest Edge
-    night gets an unmistakable green-accented headline card; a quiet night
-    still reads as a full email off the compact slate + results list rather
-    than empty space where the headline used to be."""
+    slate), then Emerging Edge (evergreen, not tonight-specific - see
+    build_emerging_edge_html), then last night's compressed results, then
+    picks. A Rest Edge night gets an unmistakable green-accented headline
+    card; a quiet night still reads as a full email off the compact
+    slate + results list rather than empty space where the headline used
+    to be."""
     signal_games = [g for g in games_with_signals if g["signal"] == "HIGH"]
 
     def rest_edge_card(g):
@@ -513,6 +602,7 @@ def build_email_html(games_with_signals, odds_data, day_label, yesterday_results
         </td></tr>''' if games_with_signals else ""
 
     results_section = build_results_html(yesterday_results or [], yesterday_date)
+    emerging_section = build_emerging_edge_html(emerging_backtest)
 
     body_html = f'''
         <!-- TONIGHT -->
@@ -520,6 +610,9 @@ def build_email_html(games_with_signals, odds_data, day_label, yesterday_results
           <p style="font-family:{FONT};font-size:11px;font-weight:700;letter-spacing:2px;color:{BRIGHT};text-transform:uppercase;margin:0 0 10px;">Tonight</p>
           {headline_html}
         </td></tr>
+
+        <!-- EMERGING EDGE (evergreen - not tonight-specific) -->
+        {emerging_section}
 
         <!-- FULL SLATE -->
         {slate_section}
@@ -601,10 +694,11 @@ def build_fantasy_email_html(fantasy, day_label):
 
 
 # ── BUILD PLAIN TEXT VERSION ──────────────────────────────────────────────────
-def build_email_text(games_with_signals, day_label, yesterday_results=None, yesterday_date=""):
+def build_email_text(games_with_signals, day_label, yesterday_results=None, yesterday_date="", emerging_backtest=None):
     """Mirrors the HTML: tonight leads (Rest Edge headline or a plain
-    no-edge line), then the full slate, then a tight one-line-per-game
-    results list, then picks."""
+    no-edge line), then Emerging Edge (evergreen, not tonight-specific),
+    then the full slate, then a tight one-line-per-game results list,
+    then picks."""
     lines = [
         f"Grind Line — NHL Edge Report — {day_label}",
         "=" * 50,
@@ -622,6 +716,8 @@ def build_email_text(games_with_signals, day_label, yesterday_results=None, yest
     else:
         lines.append("No Rest Edge tonight — no away-B2B/home-rested-2 matchup on the slate.")
         lines.append("")
+
+    lines += build_emerging_edge_text(emerging_backtest)
 
     lines.append("FULL SLATE:")
     for g in games_with_signals:
@@ -764,11 +860,17 @@ def send_rest_edge_email():
     odds_data = fetch_odds()
     print(f"Got odds for {len(odds_data)} events")
 
+    # 5b. Fetch Emerging Edge backtest numbers (evergreen, not tonight-
+    # specific - see build_emerging_edge_html). Never blocks the send:
+    # a fetch failure just omits the section.
+    print("Fetching Emerging Edge backtest...")
+    emerging_backtest = fetch_emerging_edge_backtest()
+
     # 6. Build email
     print("Building email...")
     subject = f"⚡ NHL Edge Report — {day_label}" if n_signals > 0 else f"NHL Edge Report — {day_label}"
-    html_content = build_email_html(games_with_signals, odds_data, day_label, yesterday_results, yesterday_date)
-    text_content = build_email_text(games_with_signals, day_label, yesterday_results, yesterday_date)
+    html_content = build_email_html(games_with_signals, odds_data, day_label, yesterday_results, yesterday_date, emerging_backtest)
+    text_content = build_email_text(games_with_signals, day_label, yesterday_results, yesterday_date, emerging_backtest)
 
     # 7. Get recipients
     print("Fetching Brevo contacts...")
