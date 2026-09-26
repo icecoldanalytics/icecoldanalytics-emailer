@@ -1,0 +1,32 @@
+name: My Team Email
+on:
+  workflow_dispatch:  # Manual trigger for testing
+  # Cron disabled until we've verified a real send, same convention as
+  # daily_email.yml and fantasy_email.yml. Timing needs to be decided
+  # against player_hub.json's own refresh schedule once this has run
+  # successfully at least once.
+  # schedule:
+  #   - cron: ''
+
+jobs:
+  send-my-team-email:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests pytz
+
+      - name: Run My Team email script
+        env:
+          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python my_team_email.py
